@@ -111,4 +111,76 @@ describe('Sovereign Guard Suite', () => {
       expect(purged).toBe(0) // Fresh file not purged
     })
   })
+
+  describe('Syntactic Weight & Thermal Modulator', () => {
+    it('accurately scores short atomic vs nested multi-clause inputs', () => {
+      const shortPrompt = 'run tests'
+      const shortMetrics = SovereignGuard.calculateSyntacticWeight(shortPrompt)
+      expect(shortMetrics.score).toBeLessThan(3)
+
+      const complexPrompt = `
+        If the primary gateway is active, specifically when ((options.mode === 'strict' && isCached) || fallbackStrategy === 'retry'),
+        then execute the following pipeline:
+        - 1. Inspect payload headers;
+        - 2. Furthermore, unless authentication fails, dispatch request;
+        - 3. Conversely, return structured error response.
+      `
+      const complexMetrics = SovereignGuard.calculateSyntacticWeight(complexPrompt)
+      expect(complexMetrics.score).toBeGreaterThan(10)
+      expect(complexMetrics.metrics.logicalCount).toBeGreaterThan(3)
+      expect(complexMetrics.metrics.maxDepth).toBeGreaterThanOrEqual(2)
+      expect(complexMetrics.metrics.clauseCount).toBeGreaterThanOrEqual(3)
+    })
+
+    it('dynamically scales temperature based on syntactic complexity in agent/request', async () => {
+      const ctx = new Context()
+      SovereignGuard.apply(ctx, {
+        thermalModulator: {
+          enabled: true,
+          baseTemperature: 0.2,
+          minTemperature: 0.1,
+          maxTemperature: 0.8,
+        },
+      })
+
+      // Low complexity agent
+      const simpleAgent = {
+        messages: [
+          createUserMessage({ content: [{ type: 'text', text: 'check status' }], source: { kind: 'user' } }),
+        ],
+      } as any
+
+      const simpleConfig = await ctx.waterfall(
+        'agent/request',
+        { agent: simpleAgent, turn: 1, step: 0, signal: new AbortController().signal },
+        () => Promise.resolve({ provider: 'test', model: 'test-model' }),
+      )
+      expect(simpleConfig.temperature).toBeLessThanOrEqual(0.25)
+
+      // High complexity agent
+      const complexAgent = {
+        messages: [
+          createUserMessage({
+            content: [{
+              type: 'text',
+              text: `
+                Specifically when ((a && b) || (c && d)), if condition holds, then execute:
+                - 1. Step A;
+                - 2. Step B;
+                - 3. Furthermore, unless error occurs, commit changes.
+              `,
+            }],
+            source: { kind: 'user' },
+          }),
+        ],
+      } as any
+
+      const complexConfig = await ctx.waterfall(
+        'agent/request',
+        { agent: complexAgent, turn: 1, step: 0, signal: new AbortController().signal },
+        () => Promise.resolve({ provider: 'test', model: 'test-model' }),
+      )
+      expect(complexConfig.temperature).toBeGreaterThan(0.5)
+    })
+  })
 })

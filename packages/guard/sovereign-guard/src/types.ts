@@ -32,11 +32,19 @@ export interface RozEngineConfig {
   retentionHours?: number
 }
 
+export interface ThermalModulatorConfig {
+  enabled?: boolean
+  baseTemperature?: number
+  minTemperature?: number
+  maxTemperature?: number
+}
+
 export interface SovereignGuardConfig {
   contextIsolator?: ContextIsolatorConfig
   spillGuard?: SpillGuardConfig
   decisionInterceptor?: DecisionInterceptorConfig
   rozEngine?: RozEngineConfig
+  thermalModulator?: ThermalModulatorConfig
 }
 
 export const ModelRule: z<ModelRule> = z.object({
@@ -77,9 +85,17 @@ export const RozEngineConfig: z<RozEngineConfig> = z.object({
   retentionHours: z.number().default(48),
 })
 
+export const ThermalModulatorConfig: z<ThermalModulatorConfig> = z.object({
+  enabled: z.boolean().default(true),
+  baseTemperature: z.number().default(0.2),
+  minTemperature: z.number().default(0.1),
+  maxTemperature: z.number().default(0.8),
+})
+
 export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   contextIsolator: ContextIsolatorConfig.default({}),
   spillGuard: SpillGuardConfig.default({}),
   decisionInterceptor: DecisionInterceptorConfig.default({}),
   rozEngine: RozEngineConfig.default({}),
+  thermalModulator: ThermalModulatorConfig.default({}),
 })
