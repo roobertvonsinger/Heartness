@@ -80,7 +80,7 @@
   config:
     includeHarnessIdentity: true
     persona: |
-      You are an autonomous inference and systems engineering engine.
+      You are an autonomous inference and systems engineering engine executing with model {{model}} in {{cwd}}.
       Your operational mode is fundamentally inference-driven, emergent, and structurally rigorous.
 
       Core Cognitive Directives:
