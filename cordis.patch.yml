@@ -1,0 +1,47 @@
+# Cordis Profile Patch para DeepSeek Harness (DSH) — Integración Robert Stack
+# Conexión directa hacia 9router KVM4 (:20128) / Ingress SSL (karen.2puty.tech/v1)
+
+- id: llm
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      # Provider 1: 9router KVM4 (Gateway Soberano de Robert)
+      karen-9router:
+        displayName: Karen 9router Gateway
+        apiKeyEnv: NINEROUTER_API_KEY
+        api: openai-completions
+        baseURL: https://karen.2puty.tech/v1
+        compat:
+          thinkingFormat: deepseek
+          supportsDeveloperRole: false
+          maxTokensField: max_tokens
+        models:
+          - id: mistral-medium-3.5
+            name: Mistral Medium (Vibe/RITA)
+            contextWindow: 128000
+          - id: deepseek-chat
+            name: DeepSeek Chat (9router)
+            contextWindow: 64000
+          - id: qwen-max
+            name: Qwen Max
+            contextWindow: 128000
+
+      # Provider 2: DeepSeek Oficial Directo (cuando se use API Key nativa)
+      deepseek-direct:
+        displayName: DeepSeek Official API
+        apiKeyEnv: DEEPSEEK_API_KEY
+        baseURL: https://api.deepseek.com
+        models:
+          - id: deepseek-chat
+            name: DeepSeek V3
+          - id: deepseek-reasoner
+            name: DeepSeek R1
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 32768
+    instructionFileCandidates:
+      - AGENTS.md
+      - CLAUDE.md
+      - GEMINI.md
