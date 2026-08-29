@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepSeek Harness — Topología Real & Blindada</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 26, 43, 0.85);
+      --card-border: rgba(56, 189, 248, 0.2);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 75%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 2.2rem;
+      background: linear-gradient(135deg, #38bdf8, #10b981, #f43f5e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+    .rule-box {
+      width: 100%;
+      max-width: 1200px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .rule-title {
+      color: var(--accent-cyan);
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .rule-desc {
+      color: #cbd5e1;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.37);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(56, 189, 248, 0.2);
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .b-cyan { background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+    .b-emerald { background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); border: 1px solid var(--accent-emerald); }
+    .b-rose { background: rgba(244, 63, 94, 0.2); color: var(--accent-rose); border: 1px solid var(--accent-rose); }
+    .b-purple { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+    .b-amber { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+    h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+    .model-tag {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      background: rgba(0,0,0,0.5);
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      display: inline-block;
+      margin-bottom: 0.75rem;
+    }
+    ul {
+      list-style: none;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    li strong { color: #f1f5f9; }
+    li::before {
+      content: "▹";
+      color: var(--accent-cyan);
+      font-weight: bold;
+      margin-right: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DeepSeek Harness — Topología Real Calibrada</h1>
+    <p class="subtitle">Blindaje de Recursos: Cero Fugas de Saldo en Talacha Bruta</p>
+  </header>
+
+  <div class="rule-box">
+    <div class="rule-title">🛑 REGLA DE PROTECCIÓN DE CUOTAS (ANTI-FUGAS)</div>
+    <div class="rule-desc">
+      <strong>95% del volumen</strong> (talacha, refactors, tests, lecturas de repos) va 100% a <strong>Google Gemini Flash (1M tokens)</strong>. <strong>Mistral y Venice</strong> quedan estrictamente asignados para inferencia estratégica sin guardrails y bypass de censura, con contexto quirúrgico. <strong>BYTE eliminado</strong>.
+    </div>
+  </div>
+
+  <main class="grid">
+    <!-- GEMINI WORKHORSE -->
+    <div class="card" style="border-color: rgba(56, 189, 248, 0.5);">
+      <span class="badge b-cyan">95% Volumen Real · Workhorse</span>
+      <h2>Google Gemini 3.7 / 3.6 Flash</h2>
+      <div class="model-tag">ag/gemini-3.7-flash-high · 9router & AGY</div>
+      <ul>
+        <li><strong>Ventana:</strong> 1,048,576 tokens (1M).</li>
+        <li><strong>Coste:</strong> Ínfimo / Masivo. Cero quema de cartera.</li>
+        <li><strong>Rol:</strong> Toda la talacha pesada, refactors masivos, tests, suites y orquestación diaria.</li>
+      </ul>
+    </div>
+
+    <!-- MISTRAL ESTRATÉGICO -->
+    <div class="card" style="border-color: rgba(16, 185, 129, 0.5);">
+      <span class="badge b-emerald">Estratégico · Pocos Guardrails</span>
+      <h2>Mistral Medium 3.5 / Codestral</h2>
+      <div class="model-tag">mistral-medium-3.5 · Vibe / 9router</div>
+      <ul>
+        <li><strong>Ventana:</strong> 128,000 - 256,000 tokens.</li>
+        <li><strong>Coste:</strong> Asignación estratégica protegida.</li>
+        <li><strong>Rol:</strong> Tareas que requieren baja censura, bypass de filtros morales y directivas libres de moralina. <em>Prohibido para talacha boba.</em></li>
+      </ul>
+    </div>
+
+    <!-- VENICE QUIRÚRGICO -->
+    <div class="card" style="border-color: rgba(244, 63, 94, 0.5);">
+      <span class="badge b-rose">Zero Guardrails · Quirúrgico</span>
+      <h2>Venice AI Heretic</h2>
+      <div class="model-tag">olafangensan-glm-4.7-flash-heretic · Venice API</div>
+      <ul>
+        <li><strong>Ventana:</strong> 32,000 tokens (Carga &lt; 4k).</li>
+        <li><strong>Coste:</strong> Paga directa (Uso quirúrgico puntual).</li>
+        <li><strong>Rol:</strong> Bypass absoluto de censura cuando otros modelos se niegan por falsos positivos.</li>
+      </ul>
+    </div>
+
+    <!-- DEEPSEEK REASONER -->
+    <div class="card" style="border-color: rgba(168, 85, 247, 0.5);">
+      <span class="badge b-purple">Razonamiento Algorítmico</span>
+      <h2>DeepSeek R1 / V3 Oficial</h2>
+      <div class="model-tag">deepseek-reasoner · DeepSeek Direct API</div>
+      <ul>
+        <li><strong>Ventana:</strong> 64,000 - 128,000 tokens.</li>
+        <li><strong>Coste:</strong> Oficial Directo.</li>
+        <li><strong>Rol:</strong> Desglose puramente lógico, algoritmos densos y matemáticas.</li>
+      </ul>
+    </div>
+
+    <!-- CLAUDE MARGINAL -->
+    <div class="card" style="border-color: rgba(245, 158, 11, 0.5);">
+      <span class="badge b-amber">Uso Marginal (&lt;5%)</span>
+      <h2>Claude Sonnet 4.6</h2>
+      <div class="model-tag">ag/claude-sonnet-4-6 · 9router :20128</div>
+      <ul>
+        <li><strong>Ventana:</strong> 1,000,000 tokens.</li>
+        <li><strong>Coste:</strong> Paga alta.</li>
+        <li><strong>Rol:</strong> Exclusivamente cuando se solicita explícitamente el motor de Anthropic.</li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,47 +1,115 @@
-# Cordis Profile Patch para DeepSeek Harness (DSH) — Integración Robert Stack
-# Conexión directa hacia 9router KVM4 (:20128) / Ingress SSL (karen.2puty.tech/v1)
+# Cordis Profile Patch para DeepSeek Harness (DSH) — Stack Real Robert
+# Topología Calibrada: Gemini (Workhorse 95%) + Mistral/Venice (Estratégico Sin Guardrails) + DeepSeek Direct + Sovereign Guard Suite
 
-- id: llm
+- id: llm-pi-ai
   name: '@deepseek-ai/dsh-llm-pi-ai'
   config:
     providers:
-      # Provider 1: 9router KVM4 (Gateway Soberano de Robert)
+      # Provider 1: 9router KVM4 (Gateway Soberano)
       karen-9router:
         displayName: Karen 9router Gateway
         apiKeyEnv: NINEROUTER_API_KEY
         api: openai-completions
-        baseURL: https://karen.2puty.tech/v1
+        baseURL: http://127.0.0.1:20128/v1
         compat:
-          thinkingFormat: deepseek
+          thinkingFormat: openai
           supportsDeveloperRole: false
           maxTokensField: max_tokens
         models:
-          - id: mistral-medium-3.5
-            name: Mistral Medium (Vibe/RITA)
-            contextWindow: 128000
-          - id: deepseek-chat
-            name: DeepSeek Chat (9router)
-            contextWindow: 64000
-          - id: qwen-max
-            name: Qwen Max
-            contextWindow: 128000
+          # --- 🚀 WORKHORSE REAL (95% DE LA TALACHA, CODING Y CONTEXTO 1M) ---
+          - id: ag/gemini-3.7-flash-high
+            name: Gemini 3.7 Flash High (Talacha Pesada / 1M Ctx / Coding Masivo / Cero Quema)
+            contextWindow: 1048576
+          - id: ag/gemini-3.6-flash-high
+            name: Gemini 3.6 Flash High (Velocidad / Triage / Scripting)
+            contextWindow: 1048576
+          - id: ag/gemini-3.1-pro-low
+            name: Gemini 3.1 Pro (Razonamiento de Código Extenso)
+            contextWindow: 1048576
 
-      # Provider 2: DeepSeek Oficial Directo (cuando se use API Key nativa)
+          # --- 🎯 MISTRAL: USO ESTRATÉGICO SIN GUARDRAILS (NO TALACHA) ---
+          - id: mistral/mistral-medium-3-5
+            name: Mistral Medium 3.5 (Estratégico / Baja Censura / Bypass Inteligente)
+            contextWindow: 128000
+          - id: mistral/codestral-latest
+            name: Codestral Latest (Sintaxis Compleja / Baja Censura)
+            contextWindow: 256000
+
+          # --- 🏛️ ANTHROPIC (<5% USO MARGINAL) ---
+          - id: ag/claude-sonnet-4-6
+            name: Claude Sonnet 4.6 (Auditoría Marginal / Solo Casos Aislados)
+            contextWindow: 1000000
+
+      # Provider 2: Venice AI (Bypass Uncensored Absoluto / Inyección Quirúrgica <4k)
+      venice-ai:
+        displayName: Venice AI (Zero Guardrails / Snippets Quirúrgicos)
+        apiKeyEnv: VENICE_API_KEY
+        api: openai-completions
+        baseURL: https://api.venice.ai/api/v1
+        models:
+          - id: olafangensan-glm-4.7-flash-heretic
+            name: GLM-4.7 Flash Heretic (Uncensored / Zero Guardrail)
+            contextWindow: 32000
+          - id: venice-uncensored-1-2
+            name: Venice Uncensored 1.2
+            contextWindow: 32000
+
+      # Provider 3: DeepSeek Oficial Directo (R1 Reasoner / Fallback)
       deepseek-direct:
         displayName: DeepSeek Official API
         apiKeyEnv: DEEPSEEK_API_KEY
+        api: openai-completions
         baseURL: https://api.deepseek.com
         models:
           - id: deepseek-chat
-            name: DeepSeek V3
+            name: DeepSeek V3 Official
           - id: deepseek-reasoner
-            name: DeepSeek R1
+            name: DeepSeek R1 Official (Razonamiento Algorítmico)
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'
   config:
-    maxBytes: 32768
+    maxBytes: 65536
     instructionFileCandidates:
       - AGENTS.md
       - CLAUDE.md
       - GEMINI.md
+
+# --- 🛡️ SOVEREIGN GUARD & MIDDLEWARE SUITE ---
+- insert:
+    - id: sovereign-guard
+      name: '@deepseek-ai/dsh-sovereign-guard'
+      config:
+        contextIsolator:
+          enabled: true
+          rules:
+            - pattern: '*venice*'
+              maxTurns: 4
+              maxInputChars: 12000
+            - pattern: '*heretic*'
+              maxTurns: 4
+              maxInputChars: 12000
+            - pattern: '*mistral*'
+              maxTurns: 10
+              maxInputChars: 48000
+            - pattern: '*codestral*'
+              maxTurns: 16
+              maxInputChars: 96000
+            - pattern: '*gemini*'
+              maxTurns: 50
+              maxInputChars: 1000000
+        spillGuard:
+          enabled: true
+          maxLines: 100
+          maxBytes: 8192
+          headLines: 25
+          tailLines: 25
+          stagingDir: _archive/staging/spills
+        decisionInterceptor:
+          enabled: true
+          brainDbPath: data/brain.db
+          autoResolveSafe: true
+        rozEngine:
+          enabled: true
+          stagingDir: _archive/staging
+          retentionHours: 48

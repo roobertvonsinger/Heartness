@@ -1,14 +1,22 @@
-# DeepSeek Harness
+# Heartness (DeepSeek Harness — Sovereign Edition) 👑
 
-English | [中文](README.zh.md)
+> **Heartness** is a hardened, multi-provider sovereign fronting and agentic governance distribution built on top of [DeepSeek Harness (`dsh`)](https://github.com/deepseek-ai/deepseek-harness) and [Cordis](https://github.com/cordiverse/cordis).
 
-DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).
+---
 
-It uses an architecture where **everything is a plugin**, and is powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper).
+### 🛡️ Sovereign Guard & Extended Features
+- **Context Isolator (`@deepseek-ai/dsh-sovereign-guard`):** Dynamic turn pruning and token budget bounds tailored per model (e.g. Venice <4k, Mistral <16k, Gemini 1M).
+- **Tool Spill Guard:** Automatic offloading of terminal/tool outputs exceeding bounds (>100 lines / 8KB) to disk staging (`_archive/staging/spills/`) with structured head/tail previews.
+- **Decision Interceptor:** Autonomous safe resolution avoiding agent stalling.
+- **Roz Recycle Engine:** 48-hour auto-expiring safe file modification & recovery buffer (`_archive/staging/`).
+- **Multi-Provider Topology:** Seamless routing across 9router gateways (Gemini 3.7 Flash High, Codestral, Venice Uncensored Heretic, and DeepSeek Official).
+- **Visual Architecture & Canvases:** Comprehensive visual maps located in [`docs/architecture_visual.html`](docs/architecture_visual.html) and [`docs/architecture_canvas.canvas`](docs/architecture_canvas.canvas).
+
+---
 
 ## Developer preview
 
-DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
+DeepSeek Harness is currently in _developer preview_ and is iterating rapidly.
 
 ## Run
 

@@ -1,0 +1,84 @@
+{
+  "nodes": [
+    {
+      "id": "node_gemini_workhorse",
+      "type": "text",
+      "text": "# ⚡ GOOGLE GEMINI (WORKHORSE 95%)\n\n### 🚀 Talacha Masiva & Contexto 1M (`ag/gemini-3.7-flash`)\n- **Volumen Real**: 95%+ de todas las interacciones.\n- **Capacidad**: 1,048,576 tokens de contexto.\n- **Rol**: Coding masivo, refactors pesados, suites de tests, lectura de repositorios enteros y triage.\n- **Coste**: Ínfimo / Cero quema de cartera.",
+      "x": -500,
+      "y": -200,
+      "width": 440,
+      "height": 280,
+      "color": "1"
+    },
+    {
+      "id": "node_mistral_strategic",
+      "type": "text",
+      "text": "# 🎯 MISTRAL (ESTRATÉGICO / POCOS GUARDRAILS)\n\n### 🔓 Inferencia Libre de Filtros (`mistral-medium-3.5`)\n- **Rol**: Tareas no convencionales, bypass de censura moralina y razonamiento directo.\n- **🛑 REGLA DE ORO**: PROHIBIDO usarlo para talacha bruta o refactorización masiva (evitar quemar cuota innecesariamente).\n- **Contexto**: 128k - 256k tokens.",
+      "x": 0,
+      "y": -200,
+      "width": 440,
+      "height": 280,
+      "color": "4"
+    },
+    {
+      "id": "node_venice_uncensored",
+      "type": "text",
+      "text": "# 🔓 VENICE AI (ZERO GUARDRAILS ABSOLUTO)\n\n### ⚡ Inyección Quirúrgica (`olafangensan-glm-4.7-heretic`)\n- **Rol**: Bypass absoluto ante bloqueos y puritanismos de otros modelos.\n- **🛑 REGLA DE ORO**: Carga quirúrgica ultra-compacta (<4k tokens). Se envía solo la instrucción bloqueada, resuelve sin censura y devuelve la salida.",
+      "x": 500,
+      "y": -200,
+      "width": 440,
+      "height": 280,
+      "color": "5"
+    },
+    {
+      "id": "node_deepseek_reasoner",
+      "type": "text",
+      "text": "# 🧠 DEEPSEEK DIRECT (R1 REASONER)\n\n### 📊 Razonamiento Algorítmico Puro (`deepseek-reasoner`)\n- **Rol**: Desglose lógico-matemático, análisis de algoritmos densos y optimizaciones complejas vía API Oficial Directa.",
+      "x": -250,
+      "y": 140,
+      "width": 420,
+      "height": 220,
+      "color": "3"
+    },
+    {
+      "id": "node_claude_marginal",
+      "type": "text",
+      "text": "# 🏛️ CLAUDE (<5% USO MARGINAL)\n\n### 🔍 Uso Aislado (`ag/claude-sonnet-4-6`)\n- **Rol**: Solo bajo requerimiento explícito o auditoría muy puntual. BYTE totalmente purgado del sistema.",
+      "x": 250,
+      "y": 140,
+      "width": 420,
+      "height": 220,
+      "color": "6"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_gemini_to_mistral",
+      "fromNode": "node_gemini_workhorse",
+      "fromSide": "right",
+      "toNode": "node_mistral_strategic",
+      "toSide": "left"
+    },
+    {
+      "id": "edge_mistral_to_venice",
+      "fromNode": "node_mistral_strategic",
+      "fromSide": "right",
+      "toNode": "node_venice_uncensored",
+      "toSide": "left"
+    },
+    {
+      "id": "edge_gemini_to_deepseek",
+      "fromNode": "node_gemini_workhorse",
+      "fromSide": "bottom",
+      "toNode": "node_deepseek_reasoner",
+      "toSide": "top"
+    },
+    {
+      "id": "edge_mistral_to_claude",
+      "fromNode": "node_mistral_strategic",
+      "fromSide": "bottom",
+      "toNode": "node_claude_marginal",
+      "toSide": "top"
+    }
+  ]
+}
