@@ -51,7 +51,7 @@ describe('Advanced Sovereign Guard Suite (Components 3, 4, 5, 6)', () => {
       expect(v1?.diffSummary).toContain('Initial version')
 
       // Version 2 (mutated)
-      writeFileSync(targetFile, 'export const version = 2;\nexport const name = "Heartness";')
+      writeFileSync(targetFile, 'export const version = 2;\nexport const name = "DeepSick Hardness";')
       const v2 = engine.createFileVersion(targetFile, 'dev-2')
       expect(v2).toBeDefined()
       expect(v2?.parentChecksum).toBe(v1?.checksum)

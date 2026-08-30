@@ -61,7 +61,7 @@ async function createRepo() {
     },
     body: JSON.stringify({
       name: repoName,
-      description: 'Heartness — DeepSeek Harness Sovereign Fronting & Governance Suite with Cordis Middlewares & Multi-Provider Gateway',
+      description: 'DeepSick Hardness (DSH) — Sovereign Fronting & Governance Suite with Cordis Middlewares & Multi-Provider Gateway',
       private: false,
       has_issues: true,
       has_projects: true,

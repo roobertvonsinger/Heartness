@@ -23,9 +23,10 @@ export function registerReflexiveAuditor(ctx: Context, config: ReflexiveAuditorC
 
   ctx.on('agent/pre-step', async (payload: any, next: any): Promise<PreStepDecision> => {
     const agent = payload?.agent
-    const downstream: PreStepDecision = typeof next === 'function' ? await next() : { kind: 'enter', messages: payload?.messages ?? [] }
+    const nextRes = typeof next === 'function' ? await next() : null
+    const downstream: PreStepDecision = nextRes ?? { kind: 'enter', messages: payload?.messages ?? [] }
 
-    if (downstream.kind !== 'enter' || !agent) return downstream
+    if (!downstream || downstream.kind !== 'enter' || !agent) return downstream ?? { kind: 'enter', messages: payload?.messages ?? [] }
 
     let state = agentStates.get(agent)
     if (!state) {

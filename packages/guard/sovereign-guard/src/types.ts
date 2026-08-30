@@ -169,6 +169,71 @@ export interface ToneGovernorConfig {
   antiSlopFilter?: boolean
 }
 
+export interface ContextSynthesizerConfig {
+  enabled?: boolean
+  maxRawCharsThreshold?: number
+  sidecarEndpoint?: string
+  sidecarModel?: string
+  fallbackToLocalAST?: boolean
+  maxSummaryTokens?: number
+  extractSignatures?: boolean
+}
+
+export interface GraphifyCartographerConfig {
+  enabled?: boolean
+  graphPath?: string
+  maxDepth?: number
+  autoInjectSubgraphs?: boolean
+  godNodesThreshold?: number
+}
+
+export interface ProactiveIntentRadarConfig {
+  enabled?: boolean
+  antiTunnelVision?: boolean
+  injectStateOfTheArt?: boolean
+  sovereignRegistryUrl?: string
+  domainGuidelines?: string[]
+}
+
+export interface ExecutiveCognitionConfig {
+  enabled?: boolean
+  enforceEmpiricalDeduction?: boolean
+  maintainInvisibleFallback?: boolean
+  agentOrchestratorEnabled?: boolean
+  delegationTargets?: {
+    rita?: string
+    karen?: string
+    sidecars?: string[]
+  }
+}
+
+export interface CartesiaVoiceProfile {
+  modelId?: string
+  voiceId?: string
+  speed?: number
+  wsUrl?: string
+  language?: string
+}
+
+export interface ElevenLabsVoiceProfile {
+  modelId?: string
+  voiceId?: string
+  stability?: number
+  similarityBoost?: number
+  speechEngineId?: string
+}
+
+export interface DualTrackVoiceConfig {
+  enabled?: boolean
+  provider?: 'cartesia' | 'elevenlabs' | 'auto_failover'
+  cartesia?: CartesiaVoiceProfile
+  elevenlabs?: ElevenLabsVoiceProfile
+  stripMarkdownFromSpeech?: boolean
+  maxSpeechChars?: number
+  voiceTagDelimiters?: string[]
+  dialect?: string
+}
+
 export interface SovereignGuardConfig {
   contextIsolator?: ContextIsolatorConfig
   spillGuard?: SpillGuardConfig
@@ -182,6 +247,12 @@ export interface SovereignGuardConfig {
   keepAlive?: KeepAliveGatewayConfig
   stepFeedback?: StepFeedbackConfig
   toneGovernor?: ToneGovernorConfig
+  synthesizer?: ContextSynthesizerConfig
+  graphify?: GraphifyCartographerConfig
+  intentRadar?: ProactiveIntentRadarConfig
+  attentionAnchor?: AttentionAnchorConfig
+  executiveCognition?: ExecutiveCognitionConfig
+  voiceGateway?: DualTrackVoiceConfig
 }
 
 export const ModelRule: z<ModelRule> = z.object({
@@ -329,6 +400,84 @@ export const ToneGovernorConfig: z<ToneGovernorConfig> = z.object({
   antiSlopFilter: z.boolean().default(true),
 })
 
+export const ContextSynthesizerConfig: z<ContextSynthesizerConfig> = z.object({
+  enabled: z.boolean().default(true),
+  maxRawCharsThreshold: z.number().default(1500),
+  sidecarEndpoint: z.string().default('http://2.25.98.162:20128/v1'),
+  sidecarModel: z.string().default('ag/gemini-3.7-flash-high'),
+  fallbackToLocalAST: z.boolean().default(true),
+  maxSummaryTokens: z.number().default(250),
+  extractSignatures: z.boolean().default(true),
+})
+
+export const GraphifyCartographerConfig: z<GraphifyCartographerConfig> = z.object({
+  enabled: z.boolean().default(true),
+  graphPath: z.string().default('.graphify/graph.json'),
+  maxDepth: z.number().default(3),
+  autoInjectSubgraphs: z.boolean().default(true),
+  godNodesThreshold: z.number().default(5),
+})
+
+export const ProactiveIntentRadarConfig: z<ProactiveIntentRadarConfig> = z.object({
+  enabled: z.boolean().default(true),
+  antiTunnelVision: z.boolean().default(true),
+  injectStateOfTheArt: z.boolean().default(true),
+  sovereignRegistryUrl: z.string().default('http://2.25.98.162:9000/services'),
+  domainGuidelines: z.array(z.string()).default([
+    'KVM4 Karen Engine: http://2.25.98.162:8642/v1',
+    '9router LLM Gateway: http://2.25.98.162:20128/v1',
+    'Proxy-Gate: http://2.25.98.162:8888',
+    'Captcha-Hub: http://2.25.98.162:8889',
+    'Brain Memory DB: data/brain.db',
+  ]),
+})
+
+export const AttentionAnchorConfig: z<AttentionAnchorConfig> = z.object({
+  enabled: z.boolean().default(true),
+  maxLedgerHistory: z.number().default(20),
+  lockGoalImmutability: z.boolean().default(true),
+  injectLedgerHeader: z.boolean().default(true),
+})
+
+export const ExecutiveCognitionConfig: z<ExecutiveCognitionConfig> = z.object({
+  enabled: z.boolean().default(true),
+  enforceEmpiricalDeduction: z.boolean().default(true),
+  maintainInvisibleFallback: z.boolean().default(true),
+  agentOrchestratorEnabled: z.boolean().default(true),
+  delegationTargets: z.object({
+    rita: z.string().default('vibe --agent rita'),
+    karen: z.string().default('http://2.25.98.162:8642/v1'),
+    sidecars: z.array(z.string()).default(['rita-explore', 'rita-review', 'rita-deploy']),
+  }).default({}),
+})
+
+export const CartesiaVoiceProfile: z<CartesiaVoiceProfile> = z.object({
+  modelId: z.string().default('sonic-3.6'),
+  voiceId: z.string().default('1cc00672-e9d4-455e-b3fb-31dfb7aad231'),
+  speed: z.number().default(1.0),
+  wsUrl: z.string().default('wss://api.cartesia.ai/tts/websocket'),
+  language: z.string().default('es'),
+})
+
+export const ElevenLabsVoiceProfile: z<ElevenLabsVoiceProfile> = z.object({
+  modelId: z.string().default('eleven_turbo_v2_5'),
+  voiceId: z.string().default('4xkUqaR9MYOJHoaC1Nak'),
+  stability: z.number().default(0.5),
+  similarityBoost: z.number().default(0.75),
+  speechEngineId: z.string().default('seng_sovereign_dsh'),
+})
+
+export const DualTrackVoiceConfig: z<DualTrackVoiceConfig> = z.object({
+  enabled: z.boolean().default(true),
+  provider: z.string().default('auto_failover') as any,
+  cartesia: CartesiaVoiceProfile.default({}),
+  elevenlabs: ElevenLabsVoiceProfile.default({}),
+  stripMarkdownFromSpeech: z.boolean().default(true),
+  maxSpeechChars: z.number().default(400),
+  voiceTagDelimiters: z.array(z.string()).default(['<voice>', '</voice>']),
+  dialect: z.string().default('es-MX'),
+})
+
 export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   contextIsolator: ContextIsolatorConfig.default({}),
   spillGuard: SpillGuardConfig.default({}),
@@ -342,5 +491,11 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   keepAlive: KeepAliveGatewayConfig.default({}),
   stepFeedback: StepFeedbackConfig.default({}),
   toneGovernor: ToneGovernorConfig.default({}),
+  synthesizer: ContextSynthesizerConfig.default({}),
+  graphify: GraphifyCartographerConfig.default({}),
+  intentRadar: ProactiveIntentRadarConfig.default({}),
+  attentionAnchor: AttentionAnchorConfig.default({}),
+  executiveCognition: ExecutiveCognitionConfig.default({}),
+  voiceGateway: DualTrackVoiceConfig.default({}),
 })
 

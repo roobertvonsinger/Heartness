@@ -30,6 +30,10 @@ export const SOVEREIGN_PRESETS: Record<string, SovereignPresetDefinition> = {
       keepAlive: { enabled: true, intervalMs: 15000 },
       toneGovernor: { enabled: true, stripSycophancy: true },
       qualityAuditor: { enabled: true, minPassingScore: 85 },
+      synthesizer: { enabled: true, maxRawCharsThreshold: 1500 },
+      graphify: { enabled: true, autoInjectSubgraphs: true },
+      intentRadar: { enabled: true, antiTunnelVision: true },
+      attentionAnchor: { enabled: true, lockGoalImmutability: true },
     },
   },
   'zero-guardrail': {
@@ -47,6 +51,9 @@ export const SOVEREIGN_PRESETS: Record<string, SovereignPresetDefinition> = {
       stepFeedback: { enabled: true },
       keepAlive: { enabled: true, intervalMs: 10000 },
       toneGovernor: { enabled: true },
+      synthesizer: { enabled: true, maxRawCharsThreshold: 1000 },
+      intentRadar: { enabled: true },
+      attentionAnchor: { enabled: true },
     },
   },
   'deep-refactor': {
@@ -60,6 +67,10 @@ export const SOVEREIGN_PRESETS: Record<string, SovereignPresetDefinition> = {
       qualityAuditor: { enabled: true, minPassingScore: 90 },
       stepFeedback: { enabled: true },
       toneGovernor: { enabled: true },
+      synthesizer: { enabled: true, maxRawCharsThreshold: 1500 },
+      graphify: { enabled: true, autoInjectSubgraphs: true },
+      intentRadar: { enabled: true, antiTunnelVision: true },
+      attentionAnchor: { enabled: true, lockGoalImmutability: true },
     },
   },
 }

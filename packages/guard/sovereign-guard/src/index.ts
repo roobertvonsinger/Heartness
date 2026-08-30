@@ -19,6 +19,12 @@ import { registerQualityAuditor } from './quality-auditor.ts'
 import { registerKeepAliveGateway } from './keep-alive-gateway.ts'
 import { registerStepFeedback } from './step-feedback.ts'
 import { registerToneGovernor } from './tone-governor.ts'
+import { registerContextSynthesizer } from './context-synthesizer.ts'
+import { registerGraphifyCartographer } from './graphify-cartographer.ts'
+import { registerIntentRadar } from './intent-radar.ts'
+import { registerAttentionAnchor } from './attention-anchor.ts'
+import { registerExecutiveCognition } from './executive-director.ts'
+import { registerVoiceGateway } from './voice-gateway.ts'
 
 export const name = 'sovereign-guard'
 export const Config = SovereignGuardConfig
@@ -46,6 +52,14 @@ export type {
   KeepAliveGatewayConfig,
   StepFeedbackConfig,
   ToneGovernorConfig,
+  ContextSynthesizerConfig,
+  GraphifyCartographerConfig,
+  ProactiveIntentRadarConfig,
+  AttentionAnchorConfig,
+  ExecutiveCognitionConfig,
+  CartesiaVoiceProfile,
+  ElevenLabsVoiceProfile,
+  DualTrackVoiceConfig,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'
@@ -61,6 +75,12 @@ export { createKeepAliveSession, registerKeepAliveGateway } from './keep-alive-g
 export { generateStepPill, MidTurnSteeringQueue, globalSteeringQueue, registerStepFeedback } from './step-feedback.ts'
 export { sanitizeToneOutput, getSovereignSystemDirectives, registerToneGovernor } from './tone-governor.ts'
 export { SOVEREIGN_PRESETS, resolveSovereignPreset } from './presets.ts'
+export { extractASTOutline, synthesizeRawOutput, registerContextSynthesizer } from './context-synthesizer.ts'
+export { loadKnowledgeGraph, queryGraph, findDependencyPath, getGodNodes, registerGraphifyCartographer } from './graphify-cartographer.ts'
+export { detectIntent, generateSovereignRadarBriefing, registerIntentRadar } from './intent-radar.ts'
+export { AttentionLedger, globalAttentionLedger, registerAttentionAnchor } from './attention-anchor.ts'
+export { EXECUTIVE_COGNITION_DIRECTIVES, injectExecutiveDirectives, synthesizeExecutivePlan, registerExecutiveCognition } from './executive-director.ts'
+export { cleanMarkdownForSpeech, extractDualTrackPayload, registerVoiceGateway } from './voice-gateway.ts'
 
 export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerContextIsolator(ctx, config.contextIsolator ?? {})
@@ -75,5 +95,11 @@ export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerKeepAliveGateway(ctx, config.keepAlive ?? {})
   registerStepFeedback(ctx, config.stepFeedback ?? {})
   registerToneGovernor(ctx, config.toneGovernor ?? {})
+  registerContextSynthesizer(ctx, config.synthesizer ?? {})
+  registerGraphifyCartographer(ctx, config.graphify ?? {})
+  registerIntentRadar(ctx, config.intentRadar ?? {})
+  registerAttentionAnchor(ctx, config.attentionAnchor ?? {})
+  registerExecutiveCognition(ctx, config.executiveCognition ?? {})
+  registerVoiceGateway(ctx, config.voiceGateway ?? {})
 }
 

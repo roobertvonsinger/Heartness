@@ -1,11 +1,11 @@
-# Launcher y Runner de DeepSeek Harness (DSH) - Stack Robert
+# Launcher y Runner de DeepSick Hardness (DSH) - Stack Robert
 param(
     [switch]$NoOpen,
     [string]$Port = '3080'
 )
 
 Write-Host '==========================================================================' -ForegroundColor Cyan
-Write-Host ' INICIANDO DEEPSEEK HARNESS (DSH) CON CORDIS & 9ROUTER' -ForegroundColor Cyan
+Write-Host ' INICIANDO DEEPSICK HARDNESS (DSH) CON CORDIS & 9ROUTER' -ForegroundColor Cyan
 Write-Host '==========================================================================' -ForegroundColor Cyan
 
 $env:NINEROUTER_API_KEY = 'kvm4-hermes-super-2026'

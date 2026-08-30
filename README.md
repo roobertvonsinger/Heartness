@@ -1,6 +1,6 @@
-# Heartness (DeepSeek Harness — Sovereign Edition) 👑
+# DeepSick Hardness (DSH) 👑
 
-> **Heartness** is a hardened, multi-provider sovereign fronting and agentic governance distribution built on top of [DeepSeek Harness (`dsh`)](https://github.com/deepseek-ai/deepseek-harness) and [Cordis](https://github.com/cordiverse/cordis).
+> **DeepSick Hardness (DSH)** is a hardened, multi-provider sovereign fronting and agentic governance distribution built on top of [DeepSick Hardness (DSH)](https://github.com/deepseek-ai/deepseek-harness) and [Cordis](https://github.com/cordiverse/cordis).
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## Developer preview
 
-DeepSeek Harness is currently in _developer preview_ and is iterating rapidly.
+DeepSick Hardness (DSH) is currently in _developer preview_ and is iterating rapidly.
 
 ## Run
 
@@ -48,7 +48,7 @@ pnpm dsh web
 
 - Feel free to submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
 - Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/Ycq5dCaS4">DeepSeek Harness Discord community</a>.
+- Join <a href="https://discord.gg/Ycq5dCaS4">DeepSick Hardness (DSH) Discord community</a>.
 
 ## Contributing
 
