@@ -26,8 +26,13 @@ import { registerAttentionAnchor } from './attention-anchor.ts'
 import { registerExecutiveCognition } from './executive-director.ts'
 import { registerVoiceGateway } from './voice-gateway.ts'
 import { registerVoiceGuard } from './voice-guard.ts'
+import { registerReflexiveLearner } from './reflexive-learner.ts'
+import { registerHTCCalibrator } from './htc-calibrator.ts'
+import { registerBrainGraph } from './brain-graph.ts'
+import { registerOpenDesign } from './open-design.ts'
 
 export const name = 'sovereign-guard'
+
 export const Config = SovereignGuardConfig
 
 export type {
@@ -66,6 +71,24 @@ export type {
   ElevenLabsStreamRequest,
   VoiceGuardConfig,
   VoiceEconomyReport,
+  BrainBridgeConfig,
+  ReflexiveLearnerConfig,
+  SwarmOrchestratorConfig,
+  SwarmAgentProfile,
+  SwarmAgentRole,
+  SwarmExecutionMode,
+  SwarmTaskRequest,
+  SwarmAgentResponse,
+  SwarmTaskResult,
+  HTCCalibratorConfig,
+  BrainGraphConfig,
+  DesignTokenPalette,
+  DesignSystemSpec,
+  DesignAuditResult,
+  NodeCanvasItem,
+  NodeCanvasEdge,
+  NodeCanvasGraph,
+  OpenDesignConfig,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'
@@ -85,8 +108,10 @@ export { extractASTOutline, synthesizeRawOutput, registerContextSynthesizer } fr
 export { loadKnowledgeGraph, queryGraph, findDependencyPath, getGodNodes, registerGraphifyCartographer } from './graphify-cartographer.ts'
 export { detectIntent, generateSovereignRadarBriefing, registerIntentRadar } from './intent-radar.ts'
 export { AttentionLedger, globalAttentionLedger, registerAttentionAnchor } from './attention-anchor.ts'
-export { EXECUTIVE_COGNITION_DIRECTIVES, injectExecutiveDirectives, synthesizeExecutivePlan, registerExecutiveCognition } from './executive-director.ts'
+export { loadSovereignAgent } from './agent-loader.ts'
+export type { SovereignAgent, AgentVoiceProfile, AgentModelConfig } from './agent-loader.ts'
 export {
+  isSpeakable,
   cleanMarkdownForSpeech,
   splitIntoSpeechSentences,
   generateToolSpeechAnnouncement,
@@ -104,6 +129,45 @@ export {
   VoiceQuotaGuard,
   registerVoiceGuard,
 } from './voice-guard.ts'
+export { BrainBridge } from './brain-bridge.ts'
+export type { TaskParkingItem, ProceduralMemoryItem } from './brain-bridge.ts'
+export {
+  ReflexiveLearner,
+  calculateTraceDeterminism,
+  calculateSkillUniqueness,
+  formatSkillMarkdown,
+  registerReflexiveLearner,
+} from './reflexive-learner.ts'
+export type { ExecutionStepTrace } from './reflexive-learner.ts'
+export { SwarmOrchestrator } from './swarm-orchestrator.ts'
+export { HTCCalibrator, registerHTCCalibrator } from './htc-calibrator.ts'
+export type { MacroDynamicsFeatures, MicroStabilityFeatures, TrajectoryTrace } from './htc-calibrator.ts'
+export { BrainGraph, registerBrainGraph } from './brain-graph.ts'
+export type {
+  GraphNodeKind,
+  GraphEdgeRelation,
+  GraphNodeRecord,
+  GraphEdgeRecord,
+  CalibratedPrior,
+  PruneReport,
+} from './brain-graph.ts'
+export {
+  SOVEREIGN_DARK,
+  RITA_NEON,
+  LINEAR_SLATE,
+  STRIPE_VIBRANT,
+  BUILTIN_DESIGN_SYSTEMS,
+  resolveDesignSystem,
+  parseDesignSystemMarkdown,
+  formatDesignSystemMarkdown,
+  formatDesignSystemPrompt,
+  evaluateDesignQuality,
+  generateInteractiveCanvas,
+  generateArchitectureDiagram,
+  exportDesignArtifact,
+  generatePreviewWrapper,
+  registerOpenDesign,
+} from './open-design.ts'
 
 export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerContextIsolator(ctx, config.contextIsolator ?? {})
@@ -125,5 +189,8 @@ export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerExecutiveCognition(ctx, config.executiveCognition ?? {})
   registerVoiceGateway(ctx, config.voiceGateway ?? {})
   registerVoiceGuard(ctx, config.voiceGuard ?? {})
+  registerReflexiveLearner(ctx, config.reflexiveLearner ?? {})
+  registerHTCCalibrator(ctx, config.htcCalibrator ?? {})
+  registerBrainGraph(ctx, config.brainGraph ?? {})
+  registerOpenDesign(ctx, config.openDesign ?? {})
 }
-

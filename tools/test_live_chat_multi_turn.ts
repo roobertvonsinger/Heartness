@@ -1,79 +1,45 @@
-/**
- * Ultra-Low Latency Streaming Interactive Voice Chat for RITA on DSH.
- * - Single-source-of-truth: Loads soul, voice & model from agents/rita/
- * - Real-time concurrent token streaming (<150ms TTFT)
- * - Pipelined Early Sentence Dispatch to Cartesia Sonic 3.6 (<450ms real TTFA from Enter)
- * - Full Dual-Track audiovisual support (Voice at beginning + rich Markdown on screen)
- */
-
-import * as readline from 'node:readline'
 import { spawn } from 'node:child_process'
 import {
   cleanMarkdownForSpeech,
   parseVoiceTagAttributes,
   buildCartesiaWebSocketPayload,
   isSpeakable,
-  loadSovereignAgent,
-} from '../packages/guard/sovereign-guard/src/index.ts'
-
-// Cargar agente soberano RITA como única fuente de verdad
-const rita = loadSovereignAgent('rita')
+} from '../packages/guard/sovereign-guard/src/voice-gateway.ts'
+import { EXECUTIVE_COGNITION_DIRECTIVES } from '../packages/guard/sovereign-guard/src/executive-director.ts'
 
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY || ''
 const CARTESIA_KEY = process.env.CARTESIA_API_KEY || process.env.CARTESIA_API_KEY || ''
-const CARTESIA_VOICE_ID = process.env.CARTESIA_VOICE_ID || rita.voice.voiceId
+const CARTESIA_VOICE_ID = process.env.CARTESIA_VOICE_ID || '615e09e3-99ec-4ea8-b2ae-86b07c2961da'
 
-interface ChatMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string
-}
+const SYSTEM_PROMPT = `${EXECUTIVE_COGNITION_DIRECTIVES}
+Eres DeepSick Hardness (DSH), el sistema operativo y copiloto agéntico de desarrollo de Robert.
+Estilo: Español mexicano directo (MX), conciso, sin rodeos, técnico y resolutivo.
 
-const conversationHistory: ChatMessage[] = [
-  { role: 'system', content: rita.soulMarkdown },
-]
+ESTRUCTURA DE RESPUESTA DUAL-TRACK (PROTECCIÓN TDAH):
+Toda respuesta DEBE comenzar OBLIGATORIAMENTE con la etiqueta <voice> en la primera línea, seguida por el Markdown para pantalla:
 
-/**
- * Extrae la siguiente unidad fonética/oración completa de un buffer de texto acumulativo.
- * Para la primera emisión, permite cortes en comas/pausas naturales si la longitud supera 6 palabras,
- * garantizando TTFA < 350ms hacia Cartesia Sonic 3.6.
- */
-function extractNextSentence(buffer: string, allowSubClauses = true): { sentence: string; rest: string } | null {
+<voice emotion="positivity:high|curiosity|urgent|neutral" speed="1.05">
+Aquí tu síntesis ejecutiva oral en 2 a 3 oraciones completas y naturales (es-MX). Explica el fondo, la intuición técnica clave y el norte sin leer código ni repetir palabra por palabra la pantalla.
+</voice>
+
+[Tu contenido estructurado en Markdown para pantalla aquí]`
+
+function extractNextSentence(buffer: string): { sentence: string; rest: string } | null {
   const trimmed = buffer.trimStart()
   if (!trimmed) return null
 
-  // 1. Oración estándar delimitada por punto, exclamación, interrogación o doble salto de línea
-  const fullSentenceMatch = trimmed.match(/^([^\n.!?]+[.!?]+(?:\s+|\n*)|[^\n]+\n\n+)/)
-  if (fullSentenceMatch) {
-    const rawSentence = fullSentenceMatch[0]
+  const match = trimmed.match(/^([^\n.!?]+[.!?]+(?:\s+|\n*)|[^\n]+\n\n+)/)
+  if (match) {
+    const rawSentence = match[0]
     const consumedLength = buffer.indexOf(rawSentence) + rawSentence.length
     return {
       sentence: rawSentence.trim(),
       rest: buffer.slice(consumedLength),
     }
   }
-
-  // 2. Cláusula temprana para baja latencia (coma o dos puntos si ya hay >= 6 palabras y >30 caracteres)
-  if (allowSubClauses) {
-    const clauseMatch = trimmed.match(/^([^,;:—\n]{25,}[,;:—](?:\s+|\n*))/)
-    if (clauseMatch) {
-      const rawClause = clauseMatch[0]
-      const words = rawClause.trim().split(/\s+/)
-      if (words.length >= 5) {
-        const consumedLength = buffer.indexOf(rawClause) + rawClause.length
-        return {
-          sentence: rawClause.trim(),
-          rest: buffer.slice(consumedLength),
-        }
-      }
-    }
-  }
-
   return null
 }
 
-/**
- * Cola de audio en streaming continuo hacia ffplay vía pipe:0.
- */
 class StreamingAudioQueue {
   private player: any = null
   private t0 = 0
@@ -161,9 +127,9 @@ class StreamingAudioQueue {
 
   private async synthesize(speechText: string, modifiers: any) {
     const payload = buildCartesiaWebSocketPayload(speechText, {
-      modelId: rita.voice.modelId || 'sonic-3.6',
+      modelId: 'sonic-3.6',
       voiceId: CARTESIA_VOICE_ID,
-      language: rita.voice.language || 'es',
+      language: 'es',
     }, modifiers)
 
     const response = await fetch('https://api.cartesia.ai/tts/bytes', {
@@ -175,10 +141,10 @@ class StreamingAudioQueue {
       },
       body: JSON.stringify({
         transcript: payload.transcript,
-        model_id: rita.voice.modelId || 'sonic-3.6',
+        model_id: 'sonic-3.6',
         voice: payload.voice,
         output_format: { container: 'mp3', sample_rate: 44100 },
-        language: rita.voice.language || 'es',
+        language: 'es',
       }),
     })
 
@@ -210,14 +176,11 @@ class StreamingAudioQueue {
   public getModifiers(): any { return this.primaryModifiers }
 }
 
-/**
- * Consulta en streaming concurrente token a token a DeepSeek con despacho temprano a Cartesia.
- */
-async function streamDeepSeekDualTrack(
-  messages: ChatMessage[],
+async function streamDualTrackTurn(
+  messages: { role: string; content: string }[],
   audioQueue: StreamingAudioQueue,
   onTerminalToken: (token: string) => void,
-): Promise<{ fullContent: string; hasVoiceTag: boolean }> {
+) {
   const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -225,17 +188,16 @@ async function streamDeepSeekDualTrack(
       'Authorization': `Bearer ${DEEPSEEK_KEY}`,
     },
     body: JSON.stringify({
-      model: rita.model.primaryModel || 'deepseek-v4-flash',
+      model: 'deepseek-v4-flash',
       messages,
-      temperature: rita.model.temperature || 0.6,
-      max_tokens: rita.model.maxTokens || 1500,
+      temperature: 0.6,
+      max_tokens: 1500,
       stream: true,
     }),
   })
 
   if (!response.ok || !response.body) {
-    const errText = await response.text()
-    throw new Error(`DeepSeek API Error (${response.status}): ${errText}`)
+    throw new Error(`DeepSeek API Error: ${await response.text()}`)
   }
 
   const reader = response.body.getReader()
@@ -288,7 +250,7 @@ async function streamDeepSeekDualTrack(
                   voiceBuffer = ''
                 }
               } else if ('<voice'.startsWith(tagBuffer)) {
-                // Mantener prefijo en buffer
+                // Buffer opening tag prefix
               } else {
                 onTerminalToken(tagBuffer)
                 markdownBuffer += tagBuffer
@@ -315,7 +277,7 @@ async function streamDeepSeekDualTrack(
               }
             }
           } else {
-            // Dentro de <voice>
+            // Inside <voice>
             if (char === '<' || closeTagBuffer.length > 0) {
               closeTagBuffer += char
               if (closeTagBuffer.toLowerCase() === '</voice>') {
@@ -326,7 +288,7 @@ async function streamDeepSeekDualTrack(
                   voiceBuffer = ''
                 }
               } else if ('</voice>'.startsWith(closeTagBuffer.toLowerCase())) {
-                // Buffer de cierre
+                // Buffer closing tag prefix
               } else {
                 voiceBuffer += closeTagBuffer
                 closeTagBuffer = ''
@@ -365,72 +327,40 @@ async function streamDeepSeekDualTrack(
   return { fullContent, hasVoiceTag }
 }
 
-async function startLiveChat() {
-  console.clear()
-  console.log('\x1b[35m========================================================================\x1b[0m')
-  console.log('\x1b[1m\x1b[33m 👑 R.I.T.A. — CHAT STREAMING INTERACTIVO (DSH HARNESS) \x1b[0m')
-  console.log('\x1b[35m========================================================================\x1b[0m')
-  console.log(`\x1b[32m ✓ Identidad:\x1b[0m RITA (Albacea Estratega & Directora de Operaciones)`)
-  console.log(`\x1b[32m ✓ Inferencia:\x1b[0m ${rita.model.primaryModel} (Streaming token a token)`)
-  console.log(`\x1b[32m ✓ Voz Streaming:\x1b[0m Cartesia Sonic 3.6 (${rita.voice.voiceName || 'Ximena'} / pipe:0)`)
-  console.log('\x1b[90m Escribe tu mensaje y presiona Enter. Escribe "salir" o "exit" para terminar.\x1b[0m')
-  console.log('\x1b[35m------------------------------------------------------------------------\x1b[0m\n')
+async function runMultiTurnVerification() {
+  const history: { role: string; content: string }[] = [
+    { role: 'system', content: SYSTEM_PROMPT },
+  ]
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  })
+  console.log('=== MULTI-TURN DSH STREAMING AUDIO TEST ===\n')
 
-  const promptUser = () => {
-    rl.question('\x1b[1m\x1b[34mRobert > \x1b[0m', async (input) => {
-      const trimmed = input.trim()
-      if (!trimmed || trimmed.toLowerCase() === 'salir' || trimmed.toLowerCase() === 'exit') {
-        console.log('\x1b[33m\nHasta luego, Robert. Sesión cerrada.\x1b[0m')
-        rl.close()
-        process.exit(0)
-      }
+  // Turn 1
+  console.log('\x1b[34mRobert > Hola, todo bien?\x1b[0m')
+  process.stdout.write('\x1b[32mDSH > \x1b[0m')
+  const q1 = new StreamingAudioQueue()
+  q1.start(Date.now())
+  history.push({ role: 'user', content: 'Hola, todo bien?' })
 
-      conversationHistory.push({ role: 'user', content: trimmed })
-      process.stdout.write('\x1b[1m\x1b[35mRITA > \x1b[0m')
+  const turn1 = await streamDualTrackTurn(history, q1, (t) => process.stdout.write(t))
+  history.push({ role: 'assistant', content: turn1.fullContent })
+  await q1.finish()
+  console.log(`\n\x1b[90m[Voz: "${q1.getSpoken()}"]\x1b[0m`)
+  console.log(`\x1b[35m[⚡ TTFA Turno 1: ${q1.getTTFA()}ms]\x1b[0m\n`)
 
-      const audioQueue = new StreamingAudioQueue()
-      const t0 = Date.now()
-      audioQueue.start(t0)
+  // Turn 2
+  console.log('\x1b[34mRobert > Explicame brevemente los 3 modelos principales de DeepSeek\x1b[0m')
+  process.stdout.write('\x1b[32mDSH > \x1b[0m')
+  const q2 = new StreamingAudioQueue()
+  q2.start(Date.now())
+  history.push({ role: 'user', content: 'Explicame brevemente los 3 modelos principales de DeepSeek' })
 
-      try {
-        const { fullContent } = await streamDeepSeekDualTrack(
-          conversationHistory,
-          audioQueue,
-          (token) => process.stdout.write(token),
-        )
+  const turn2 = await streamDualTrackTurn(history, q2, (t) => process.stdout.write(t))
+  history.push({ role: 'assistant', content: turn2.fullContent })
+  await q2.finish()
+  console.log(`\n\x1b[90m[Voz: "${q2.getSpoken()}"]\x1b[0m`)
+  console.log(`\x1b[35m[⚡ TTFA Turno 2: ${q2.getTTFA()}ms]\x1b[0m\n`)
 
-        conversationHistory.push({ role: 'assistant', content: fullContent })
-
-        await audioQueue.finish()
-
-        const spoken = audioQueue.getSpoken()
-        const ttfa = audioQueue.getTTFA()
-        const mod = audioQueue.getModifiers()
-        const emotionDesc = mod.emotion ? `emoción: ${mod.emotion}` : 'emoción: positividad:high'
-        const speedDesc = mod.speed ? `velocidad: ${mod.speed}x` : 'velocidad: 1.05x'
-
-        console.log('')
-        if (spoken) {
-          process.stdout.write(`\x1b[90m[🎙️ RITA Voz: "${spoken}" | ${emotionDesc} | ${speedDesc}]\x1b[0m\n`)
-        }
-        if (ttfa > 0) {
-          console.log(`\x1b[35m[⚡ Audio en bocinas: ${ttfa}ms TTFA real desde Enter]\x1b[0m`)
-        }
-      } catch (err: any) {
-        console.log(`\x1b[31m\nError en la llamada: ${err.message}\x1b[0m`)
-      }
-
-      console.log('')
-      promptUser()
-    })
-  }
-
-  promptUser()
+  console.log('=== VERIFICACIÓN MULTI-TURNO EXITOSA ===')
 }
 
-startLiveChat().catch(console.error)
+runMultiTurnVerification().catch(console.error)

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://open-design.ai/schema/v3/manifest.json",
+  "name": "DeepSick Harness OpenDesign Engine",
+  "version": "3.0.0",
+  "activeDesignSystem": "sovereign_dark",
+  "designSystems": [
+    {
+      "id": "sovereign_dark",
+      "path": ".agents/design-systems/sovereign-dark/DESIGN.md",
+      "isDefault": true
+    },
+    {
+      "id": "rita_neon",
+      "path": ".agents/design-systems/rita-neon/DESIGN.md",
+      "isDefault": false
+    }
+  ],
+  "skills": [
+    "open-design",
+    "open-design-canvas"
+  ],
+  "antiSlopAudit": {
+    "enabled": true,
+    "minScore": 0.85,
+    "blockOnP0Violations": true
+  }
+}

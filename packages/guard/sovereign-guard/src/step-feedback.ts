@@ -200,10 +200,10 @@ export class MidTurnSteeringQueue {
     if (pending.length === 0) return undefined
 
     return (
-      `\n\n[🚨 MID-TURN SOVEREIGN USER STEERING INJECTION]\n` +
-      `Robert has injected a live steering directive during this execution turn:\n` +
+      '\n\n[🚨 MID-TURN SOVEREIGN USER STEERING INJECTION]\n' +
+      'Robert has injected a live steering directive during this execution turn:\n' +
       pending.map((d, i) => `${i + 1}. "${d}"`).join('\n') +
-      `\nPrioritize fulfilling this steering directive immediately while maintaining task integrity.`
+      '\nPrioritize fulfilling this steering directive immediately while maintaining task integrity.'
     )
   }
 }
@@ -217,24 +217,24 @@ export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = 
   if (config.enabled === false) return
 
   // Hook tool execution lifecycle to dispatch orientative pills
-  ctx.on('tool/before-execute' as any, (event: unknown) => {
+  ctx.on('tool/before-execute', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown> }
     const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {})
-    ctx.emit('progress/step-pill' as any, pill)
+    ctx.emit('progress/step-pill', pill)
   })
 
-  ctx.on('tool/after-execute' as any, (event: unknown) => {
+  ctx.on('tool/after-execute', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown>; error?: unknown }
     if (ev.error) {
       const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {}, ev.error)
-      ctx.emit('progress/step-pill' as any, pill)
+      ctx.emit('progress/step-pill', pill)
     }
   })
 
   // Hook user input during active run
-  ctx.on('user/mid-turn-input' as any, (event: unknown) => {
+  ctx.on('user/mid-turn-input', (event: unknown) => {
     if (event && typeof event === 'object') {
       const ev = event as { sessionId?: string; text?: string }
       if (ev.sessionId && ev.text) {

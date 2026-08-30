@@ -1,0 +1,19 @@
+{
+  "provider": "deepseek-official",
+  "primaryModel": "deepseek-v4-flash",
+  "temperature": 0.6,
+  "maxTokens": 1500,
+  "stream": true,
+  "failoverProviders": [
+    {
+      "provider": "9router-kvm4",
+      "baseUrl": "https://karen.2puty.tech/v1",
+      "model": "deepseek-v3"
+    },
+    {
+      "provider": "venice-ai",
+      "baseUrl": "https://api.venice.ai/api/v1",
+      "model": "llama-3.3-70b"
+    }
+  ]
+}

@@ -220,6 +220,154 @@ export interface ExecutiveCognitionConfig {
   }
 }
 
+export interface BrainBridgeConfig {
+  dbPath?: string
+  walMode?: boolean
+  busyTimeout?: number
+}
+
+export interface ReflexiveLearnerConfig {
+  enabled?: boolean
+  minDeterministicScore?: number
+  minSuccessSteps?: number
+  skillsDir?: string
+  brainDbPath?: string
+  autoExportSkills?: boolean
+  skillDiffThreshold?: number
+  ttlDays?: number
+}
+
+export type SwarmAgentRole = 'RITA' | 'ANTIGRAVITY' | 'KAREN' | 'HERMES' | 'CUSTOM'
+
+export interface SwarmAgentProfile {
+  id: string
+  role: SwarmAgentRole
+  endpoint?: string
+  systemPrompt?: string
+  timeoutMs?: number
+  apiKey?: string
+}
+
+export type SwarmExecutionMode = 'DEBATE' | 'SEQUENTIAL' | 'PARALLEL'
+
+export interface SwarmOrchestratorConfig {
+  enabled?: boolean
+  defaultTimeboxMs?: number
+}
+
+export interface HTCCalibratorConfig {
+  enabled?: boolean
+  lambdaDecay?: number
+  minEntropyThreshold?: number
+  maxRepetitionTolerance?: number
+  baselineConfidence?: number
+}
+
+export interface BrainGraphConfig {
+  dbPath?: string
+  walMode?: boolean
+  busyTimeout?: number
+  hebbianLearningRate?: number
+  decayHalfLifeDays?: number
+  minPruneWeight?: number
+}
+
+export interface DesignTokenPalette {
+  primary: string
+  secondary: string
+  background: string
+  surface: string
+  text: string
+  muted: string
+  accent: string
+  border: string
+  success: string
+  error: string
+  warning: string
+}
+
+export interface DesignSystemSpec {
+  id: string
+  name: string
+  description?: string
+  theme: 'dark' | 'light' | 'luxury_neon' | 'cyber_sovereign' | 'minimal_editorial'
+  palette: DesignTokenPalette
+  typography: {
+    fontFamilySans: string
+    fontFamilyMono: string
+    fontSizes: { xs: string; sm: string; base: string; lg: string; xl: string; '2xl': string; '3xl': string }
+    lineHeights: { tight: string; normal: string; relaxed: string }
+    fontWeights: { normal: number; medium: number; bold: number; black: number }
+  }
+  spacing: {
+    scale: number[]
+    radius: { sm: string; md: string; lg: string; full: string }
+    shadows: { sm: string; md: string; lg: string; glow: string }
+  }
+  microInteractions: {
+    transitionDuration: string
+    easing: string
+    hoverTransforms: boolean
+    activeStateFeedback: boolean
+  }
+  antiSlopDirectives: string[]
+}
+
+export interface DesignAuditResult {
+  score: number
+  isProductionReady: boolean
+  dimensions: {
+    visualHierarchy: number
+    tokenConsistency: number
+    microInteractions: number
+    responsiveCompleteness: number
+    accessibilityContrast: number
+  }
+  violations: string[]
+  checklistP0: string[]
+  checklistP1: string[]
+  checklistP2: string[]
+  remediationSuggestions: string[]
+}
+
+export interface NodeCanvasItem {
+  id: string
+  label: string
+  type: 'agent' | 'tool' | 'service' | 'model' | 'database' | 'workflow_node'
+  status?: 'active' | 'idle' | 'executing' | 'error'
+  x?: number
+  y?: number
+  metadata?: Record<string, unknown>
+}
+
+export interface NodeCanvasEdge {
+  from: string
+  to: string
+  label?: string
+  style?: 'solid' | 'dashed' | 'pulse'
+  animated?: boolean
+}
+
+export interface NodeCanvasGraph {
+  title: string
+  nodes: NodeCanvasItem[]
+  edges: NodeCanvasEdge[]
+  viewport?: { zoom: number; panX: number; panY: number }
+}
+
+export interface OpenDesignConfig {
+  enabled?: boolean
+  defaultDesignSystem?: string
+  designSystemsDir?: string
+  skillsDir?: string
+  enforceAntiSlop?: boolean
+  minAuditScore?: number
+  autoInjectDesignTokens?: boolean
+  exportFormats?: ('html' | 'svg' | 'json' | 'slide_deck')[]
+  previewPort?: number
+}
+
+
 export interface CartesiaVoiceProfile {
   modelId?: string | undefined
   voiceId?: string | undefined
@@ -561,7 +709,7 @@ export const CartesiaVoiceProfile: z<CartesiaVoiceProfile> = z.object({
     encoding: z.string(),
     sampleRate: z.number(),
   }),
-}) as any
+})
 
 export const ElevenLabsVoiceProfile: z<ElevenLabsVoiceProfile> = z.object({
   modelId: z.string().default('eleven_turbo_v2_5'),
@@ -573,7 +721,7 @@ export const ElevenLabsVoiceProfile: z<ElevenLabsVoiceProfile> = z.object({
   speed: z.number().default(1.0),
   speechEngineId: z.string().default('seng_sovereign_dsh'),
   latencyOptimization: z.number(),
-}) as any
+})
 
 export const VoiceGuardConfig: z<VoiceGuardConfig> = z.object({
   enabled: z.boolean().default(true),
@@ -582,11 +730,11 @@ export const VoiceGuardConfig: z<VoiceGuardConfig> = z.object({
   enableAudioCache: z.boolean().default(true),
   skipTrivialSpeech: z.boolean().default(true),
   enforceAdvisoryConciseness: z.boolean().default(true),
-}) as any
+})
 
 export const DualTrackVoiceConfig: z<DualTrackVoiceConfig> = z.object({
   enabled: z.boolean().default(true),
-  provider: z.string().default('auto_failover') as any,
+  provider: z.string().default('auto_failover'),
   cartesia: CartesiaVoiceProfile.default({}),
   elevenlabs: ElevenLabsVoiceProfile.default({}),
   voiceGuard: VoiceGuardConfig.default({}),
@@ -594,6 +742,57 @@ export const DualTrackVoiceConfig: z<DualTrackVoiceConfig> = z.object({
   maxSpeechChars: z.number().default(400),
   voiceTagDelimiters: z.array(z.string()).default(['<voice>', '</voice>']),
   dialect: z.string().default('es-MX'),
+})
+
+export const BrainBridgeConfig: z<BrainBridgeConfig> = z.object({
+  dbPath: z.string().default('data/brain.db'),
+  walMode: z.boolean().default(true),
+  busyTimeout: z.number().default(5000),
+})
+
+export const ReflexiveLearnerConfig: z<ReflexiveLearnerConfig> = z.object({
+  enabled: z.boolean().default(true),
+  minDeterministicScore: z.number().default(0.85),
+  minSuccessSteps: z.number().default(3),
+  skillsDir: z.string().default('.agents/skills'),
+  brainDbPath: z.string().default('data/brain.db'),
+  autoExportSkills: z.boolean().default(true),
+  skillDiffThreshold: z.number().default(0.30),
+  ttlDays: z.number().default(30),
+})
+
+export const SwarmOrchestratorConfig: z<SwarmOrchestratorConfig> = z.object({
+  enabled: z.boolean().default(true),
+  defaultTimeboxMs: z.number().default(30000),
+})
+
+export const HTCCalibratorConfig: z<HTCCalibratorConfig> = z.object({
+  enabled: z.boolean().default(true),
+  lambdaDecay: z.number().default(0.85),
+  minEntropyThreshold: z.number().default(0.5),
+  maxRepetitionTolerance: z.number().default(0.4),
+  baselineConfidence: z.number().default(0.85),
+})
+
+export const BrainGraphConfig: z<BrainGraphConfig> = z.object({
+  dbPath: z.string().default('data/brain.db'),
+  walMode: z.boolean().default(true),
+  busyTimeout: z.number().default(5000),
+  hebbianLearningRate: z.number().default(0.15),
+  decayHalfLifeDays: z.number().default(14),
+  minPruneWeight: z.number().default(0.15),
+})
+
+export const OpenDesignConfig: z<OpenDesignConfig> = z.object({
+  enabled: z.boolean().default(true),
+  defaultDesignSystem: z.string().default('sovereign_dark'),
+  designSystemsDir: z.string().default('.agents/design-systems'),
+  skillsDir: z.string().default('.agents/skills'),
+  enforceAntiSlop: z.boolean().default(true),
+  minAuditScore: z.number().default(0.85),
+  autoInjectDesignTokens: z.boolean().default(true),
+  exportFormats: z.array(z.string()).default(['html', 'svg', 'json', 'slide_deck']),
+  previewPort: z.number().default(4200),
 })
 
 export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
@@ -616,5 +815,10 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   executiveCognition: ExecutiveCognitionConfig.default({}),
   voiceGateway: DualTrackVoiceConfig.default({}),
   voiceGuard: VoiceGuardConfig.default({}),
+  brainBridge: BrainBridgeConfig.default({}),
+  reflexiveLearner: ReflexiveLearnerConfig.default({}),
+  swarmOrchestrator: SwarmOrchestratorConfig.default({}),
+  htcCalibrator: HTCCalibratorConfig.default({}),
+  brainGraph: BrainGraphConfig.default({}),
+  openDesign: OpenDesignConfig.default({}),
 })
-

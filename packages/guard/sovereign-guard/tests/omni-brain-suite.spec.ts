@@ -241,7 +241,7 @@ Todo quedó verificado con SHA-256 a1b2c3.
       expect(cleaned).not.toContain('http://')
       expect(cleaned).not.toContain('|')
       expect(cleaned).not.toContain('###')
-      expect(cleaned).toContain('El puerto 3080 está escuchando en DSH')
+      expect(cleaned).toContain('El puerto 3080 está escuchando en D-S-H')
     })
 
     it('separa limpiamente el canal de texto y el canal de voz usando tag <voice>', () => {

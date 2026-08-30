@@ -174,7 +174,7 @@ export function buildCartesiaWebSocketPayload(
   contextId?: string,
 ): CartesiaStreamRequest {
   const modelId = modifiers.modelId || profile.modelId || 'sonic-3.6'
-  const voiceId = modifiers.voiceId || profile.voiceId || '1cc00672-e9d4-455e-b3fb-31dfb7aad231'
+  const voiceId = modifiers.voiceId || profile.voiceId || '3597a26f-80ef-4bd5-8101-9699bc764917'
   const speed = modifiers.speed ?? profile.speed ?? 1.0
   const emotion = normalizeCartesiaEmotion(modifiers.emotion || profile.emotion, modifiers.intensity || profile.emotionIntensity)
 
@@ -230,14 +230,24 @@ export function buildElevenLabsPayload(
 }
 
 /**
+ * Verifica si un texto contiene caracteres alfanuméricos suficientes para ser sintetizado por TTS sin dar 400.
+ */
+export function isSpeakable(text: string): boolean {
+  if (!text) return false
+  const clean = text.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ]/g, '')
+  return clean.length >= 2
+}
+
+/**
  * Limpia y traduce texto técnico a lenguaje oral fluido en español mexicano (es-MX).
  * Expande acrónimos y cadencias para que la síntesis suene natural y conversacional.
  */
-export function cleanMarkdownForSpeech(rawText: string, maxChars = 400): string {
+export function cleanMarkdownForSpeech(rawText: string, maxChars = 0): string {
+  if (!rawText) return ''
   let text = rawText
 
   // 1. Eliminar bloques de código enteros ```...```
-  text = text.replace(/```[\s\S]*?```/g, '')
+  text = text.replace(/```[\s\S]*?```/g, ' ')
 
   // 2. Eliminar inline code `...`
   text = text.replace(/`([^`]+)`/g, '$1')
@@ -245,27 +255,43 @@ export function cleanMarkdownForSpeech(rawText: string, maxChars = 400): string 
   // 3. Convertir enlaces markdown [Texto](url) a solo "Texto"
   text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
 
-  // 4. Eliminar encabezados markdown (#, ##, ###)
+  // 4. Eliminar negritas, cursivas y tachados (**bold**, *italic*, __bold__, _italic_, ~~strike~~)
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1')
+  text = text.replace(/\*([^*]+)\*/g, '$1')
+  text = text.replace(/__([^_]+)__/g, '$1')
+  text = text.replace(/_([^_]+)_/g, '$1')
+  text = text.replace(/~~([^~]+)~~/g, '$1')
+
+  // 5. Eliminar encabezados markdown (#, ##, ###)
   text = text.replace(/^#{1,6}\s+/gm, '')
 
-  // 5. Eliminar viñetas y guiones de listas
+  // 6. Eliminar viñetas y guiones de listas
   text = text.replace(/^[\s*•-]+\s+/gm, '')
 
-  // 6. Eliminar tablas markdown (| col | col |)
-  text = text.replace(/\|[^\n]+\|/g, '')
+  // 7. Limpiar listas numeradas (1. -> 1, )
+  text = text.replace(/^\s*\d+\.\s+/gm, '')
 
-  // 7. Eliminar URLs crudas (http://...)
+  // 8. Eliminar tablas markdown (| col | col |) y líneas divisorias
+  text = text.replace(/\|[^\n]+\|/g, ' ')
+  text = text.replace(/^[-=_*]{3,}$/gm, ' ')
+
+  // 9. Eliminar URLs crudas (http://...)
   text = text.replace(/https?:\/\/[^\s]+/g, '')
 
-  // 8. Eliminar emojis y caracteres decorativos
+  // 10. Eliminar emojis y caracteres decorativos
   text = text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
 
-  // 9. Expansión fonética en español para términos técnicos comunes
+  // 11. Expansión fonética en español para términos técnicos comunes
   text = text
     .replace(/100%/g, 'cien por ciento')
     .replace(/(\d+)%/g, '$1 por ciento')
     .replace(/\b0 errores\b/gi, 'cero errores')
     .replace(/\b(\d+)\/(\d+)\b/g, '$1 de $2')
+    .replace(/\bDSH\b/g, 'D-S-H')
+    .replace(/\bLLMs\b/gi, 'L-L-Ms')
+    .replace(/\bLLM\b/gi, 'L-L-M')
+    .replace(/\bTTS\b/gi, 'T-T-S')
+    .replace(/\bSTT\b/gi, 'S-T-T')
     .replace(/\bAPIs\b/g, 'a-p-is')
     .replace(/\bAPI\b/g, 'a-p-i')
     .replace(/\bSQL\b/gi, 'ese-cu-ele')
@@ -277,12 +303,14 @@ export function cleanMarkdownForSpeech(rawText: string, maxChars = 400): string 
     .replace(/\bVPS\b/gi, 'v-p-s')
     .replace(/\bHTTP\b/gi, 'h-t-t-p')
     .replace(/\bJSON\b/gi, 'jeison')
+    .replace(/\bKVM4\b/gi, 'K-V-M cuatro')
     .replace(/\bv(\d+)\.(\d+)\b/gi, 'versión $1 punto $2')
+    .replace(/\bv(\d+)\b/gi, 'versión $1')
 
-  // 10. Colapsar espacios múltiples y saltos de línea
+  // 12. Colapsar espacios múltiples y saltos de línea
   text = text.replace(/\s+/g, ' ').trim()
 
-  if (maxChars && text.length > maxChars) {
+  if (maxChars > 0 && text.length > maxChars) {
     const truncated = text.slice(0, maxChars)
     const lastPeriod = truncated.lastIndexOf('.')
     if (lastPeriod > 50) {
@@ -292,7 +320,7 @@ export function cleanMarkdownForSpeech(rawText: string, maxChars = 400): string 
     }
   }
 
-  return text
+  return isSpeakable(text) ? text : ''
 }
 
 /**
@@ -304,15 +332,15 @@ export function splitIntoSpeechSentences(text: string): string[] {
   // Dividir por delimitadores de oraciones preservando signos
   const rawSentences = text.split(/(?<=[.!?])\s+|\n+/g)
   return rawSentences
-    .map(s => s.trim())
-    .filter(s => s.length > 0)
+    .map(s => cleanMarkdownForSpeech(s))
+    .filter(s => isSpeakable(s))
 }
 
 /**
  * Genera un micro-anuncio oral complementario cuando el agente arranca una herramienta pesada.
  * Permite "hablar mientras trabaja" sin dejar al usuario en silencio.
  */
-export function generateToolSpeechAnnouncement(toolName: string, args: Record<string, any> = {}): string {
+export function generateToolSpeechAnnouncement(toolName: string, args: Record<string, unknown> = {}): string {
   const normName = toolName.toLowerCase()
   const cmd = typeof args.CommandLine === 'string' ? args.CommandLine.toLowerCase() : ''
   const path = typeof args.TargetFile === 'string' ? args.TargetFile : ''
@@ -389,7 +417,7 @@ export function extractDualTrackPayload(
 
   const cartesiaProfile = config.cartesia ?? {
     modelId: 'sonic-3.6',
-    voiceId: '1cc00672-e9d4-455e-b3fb-31dfb7aad231',
+    voiceId: '3597a26f-80ef-4bd5-8101-9699bc764917',
     speed: 1.0,
     language: 'es',
   }
@@ -420,12 +448,26 @@ export function extractDualTrackPayload(
 }
 
 /**
+ * Emits an interruption event to purge any active audio buffers / ffplay streams immediately.
+ */
+export function interruptActiveSpeech(ctx?: Context, sessionId?: string): void {
+  if (ctx) {
+    ctx.emit('voice/interrupt' as never, { sessionId, timestamp: Date.now() })
+  }
+}
+
+/**
  * Registra el Gateway de Voz Dual-Track en Cordis.
  */
 export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('agent/pre-response' as any, async (payload: any) => {
+  // Listen to mid-turn user inputs to interrupt running voice synthesis immediately
+  ctx.on('user/mid-turn-input' as never, (event: { sessionId?: string }) => {
+    interruptActiveSpeech(ctx, event?.sessionId)
+  })
+
+  ctx.on('agent/pre-response' as never, async (payload: { content?: unknown; sessionId?: string; speechPayload?: unknown }) => {
     if (!payload || typeof payload.content !== 'string') return
 
     const dualTrack = extractDualTrackPayload(payload.content, config, payload.sessionId)
@@ -439,6 +481,6 @@ export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig 
       profile: dualTrack.ttsProfile,
     }
 
-    ctx.emit('voice/speech-ready' as any, payload.speechPayload)
+    ctx.emit('voice/speech-ready' as never, payload.speechPayload)
   })
 }

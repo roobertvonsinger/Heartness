@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ProactiveIntentRadarConfig } from './types.ts'
 
-export type IntentCategory = 'refactor' | 'new_feature' | 'debug_fix' | 'infra_ops' | 'database_storage' | 'security_guard' | 'general'
+export type IntentCategory = 'refactor' | 'new_feature' | 'debug_fix' | 'infra_ops' | 'database_storage' | 'security_guard' | 'ui_design' | 'general'
 
 export interface DetectedIntent {
   category: IntentCategory
@@ -23,6 +23,21 @@ export interface RadarBriefing {
  */
 export function detectIntent(prompt: string): DetectedIntent {
   const p = prompt.toLowerCase()
+
+  if (p.includes('diseño') || p.includes('design') || p.includes('open-design') || p.includes('opendesign') || p.includes('ui') || p.includes('canvas') || p.includes('mockup') || p.includes('dashboard') || p.includes('css') || p.includes('interfaz') || p.includes('estilo') || p.includes('wireframe') || p.includes('landing') || p.includes('slide') || p.includes('presentacion')) {
+    return {
+      category: 'ui_design',
+      confidence: 0.94,
+      primaryGoal: 'Diseño UI / Artefactos Visuales & Canvas',
+      canonicalPattern: 'OpenDesign 3.0 Protocol & 5D Anti-Slop Evaluator (DESIGN.md tokens + Composable SKILL.md)',
+      stateOfTheArtRecommendation: 'Brand-grade tokens, zero arbitrary hex colors, micro-interactions, responsive containers, WCAG AAA contrast.',
+      proactiveSuggestions: [
+        'Adherirse estrictamente a los tokens de DESIGN.md y jerarquía tipográfica',
+        'Validar dimensiones 5D (Contraste, Micro-interacciones, Responsive, Jerarquía, Tokens)',
+        'Construir componentes autónomos y exportables con preview interactivo',
+      ],
+    }
+  }
 
   if (p.includes('refactor') || p.includes('limpia') || p.includes('reorganiza') || p.includes('renombra') || p.includes('modular')) {
     return {
@@ -136,15 +151,20 @@ export function generateSovereignRadarBriefing(
   }
 }
 
+interface AgentPreStepPayload {
+  messages?: Array<{ role?: string; content?: string }>
+}
+
 /**
  * Registra el Radar de Intención Proactivo en Cordis.
  */
 export function registerIntentRadar(ctx: Context, config: ProactiveIntentRadarConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('agent/pre-step' as any, async (payload: any) => {
-    const messages = payload?.messages ?? []
-    const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop()
+  ctx.on('agent/pre-step', (payload: unknown) => {
+    const p = payload as AgentPreStepPayload | undefined
+    const messages = p?.messages ?? []
+    const lastUserMsg = messages.filter(m => m.role === 'user').pop()
     if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return
 
     // Evitar inyección duplicada si ya contiene el radar

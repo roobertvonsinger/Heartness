@@ -112,7 +112,7 @@ export class AttentionLedger {
     const lines: string[] = []
     lines.push(`[⚓ ATTENTION ANCHOR & CHECKLIST VIVA — FOCO ACTIVO INMUTABLE (Turno #${this.entry.turnCount})]`)
     lines.push(`• Objetivo Central: ${this.entry.primaryGoal}`)
-    
+
     if (this.entry.constraints.length > 0) {
       lines.push(`• Restricciones Clave: ${this.entry.constraints.join(' | ')}`)
     }
@@ -141,16 +141,31 @@ export const globalAttentionLedger = new AttentionLedger()
 /**
  * Registra el Ancla de Atención en Cordis.
  */
+interface AttentionPreStepPayload {
+  messages?: Array<{ role?: string; content?: string }>
+}
+
+interface AttentionToolResultPayload {
+  name?: string
+  toolName?: string
+  args?: { todos?: TaskItem[] }
+  arguments?: { todos?: TaskItem[] }
+}
+
+/**
+ * Registra el Ancla de Atención en Cordis.
+ */
 export function registerAttentionAnchor(ctx: Context, config: AttentionAnchorConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('agent/pre-step' as any, async (payload: any) => {
+  ctx.on('agent/pre-step', (payload: unknown) => {
     globalAttentionLedger.incrementTurn()
 
     if (config.injectLedgerHeader === false) return
 
-    const messages = payload?.messages ?? []
-    const systemMsg = messages.find((m: any) => m.role === 'system')
+    const p = payload as AttentionPreStepPayload | undefined
+    const messages = p?.messages ?? []
+    const systemMsg = messages.find(m => m.role === 'system')
     const header = globalAttentionLedger.renderAnchorHeader()
 
     if (systemMsg && typeof systemMsg.content === 'string') {
@@ -164,10 +179,11 @@ export function registerAttentionAnchor(ctx: Context, config: AttentionAnchorCon
   })
 
   // Sincronizar automáticamente eventos del tool todo_write con el AttentionLedger
-  ctx.on('tool/result' as any, async (payload: any) => {
-    const toolName = payload?.name || payload?.toolName
+  ctx.on('tool/result', (payload: unknown) => {
+    const p = payload as AttentionToolResultPayload | undefined
+    const toolName = p?.name || p?.toolName
     if (toolName === 'todo_write') {
-      const todos = payload?.args?.todos || payload?.arguments?.todos
+      const todos = p?.args?.todos || p?.arguments?.todos
       if (Array.isArray(todos)) {
         globalAttentionLedger.setTasks(todos)
       }
