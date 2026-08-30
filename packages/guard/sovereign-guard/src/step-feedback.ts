@@ -20,8 +20,8 @@ export interface StepPill {
  */
 export function generateStepPill(
   toolName: string,
-  args: Record<string, any> = {},
-  error?: any
+  args: Record<string, unknown> = {},
+  error?: unknown,
 ): StepPill {
   const timestamp = Date.now()
 
@@ -67,7 +67,7 @@ export function generateStepPill(
     const queryExcerpt = q.length > 25 ? `${q.slice(0, 22)}...` : q
     return {
       toolName,
-      pill: queryExcerpt ? `🔎 Buscando '${queryExcerpt}' en el proyecto...` : `🔎 Explorando código...`,
+      pill: queryExcerpt ? `🔎 Buscando '${queryExcerpt}' en el proyecto...` : '🔎 Explorando código...',
       category: 'search',
       timestamp,
     }
@@ -92,7 +92,7 @@ export function generateStepPill(
     if (lowerCmd.includes('vitest') || lowerCmd.includes('pytest') || lowerCmd.includes('test')) {
       return {
         toolName,
-        pill: `🧪 Ejecutando suite de pruebas y validación...`,
+        pill: '🧪 Ejecutando suite de pruebas y validación...',
         category: 'exec',
         timestamp,
       }
@@ -109,7 +109,7 @@ export function generateStepPill(
     if (lowerCmd.includes('curl') || lowerCmd.includes('http') || lowerCmd.includes('fetch')) {
       return {
         toolName,
-        pill: `🌐 Verificando servicio y conectividad de red...`,
+        pill: '🌐 Verificando servicio y conectividad de red...',
         category: 'exec',
         timestamp,
       }
@@ -117,7 +117,7 @@ export function generateStepPill(
     if (lowerCmd.includes('build') || lowerCmd.includes('tsc') || lowerCmd.includes('compile')) {
       return {
         toolName,
-        pill: `⚙️ Compilando módulos del sistema...`,
+        pill: '⚙️ Compilando módulos del sistema...',
         category: 'exec',
         timestamp,
       }
@@ -126,7 +126,7 @@ export function generateStepPill(
     const shortCmd = cmd.length > 30 ? `${cmd.slice(0, 27)}...` : cmd
     return {
       toolName,
-      pill: shortCmd ? `⚡ Ejecutando: ${shortCmd}` : `⚡ Ejecutando comando en terminal...`,
+      pill: shortCmd ? `⚡ Ejecutando: ${shortCmd}` : '⚡ Ejecutando comando en terminal...',
       category: 'exec',
       timestamp,
     }
@@ -169,7 +169,7 @@ export class MidTurnSteeringQueue {
   formatContextInjection(sessionId: string): string {
     const pending = this.popPending(sessionId)
     if (pending.length === 0) return ''
-    const formatted = pending.map((m) => `- ${m}`).join('\n')
+    const formatted = pending.map(m => `- ${m}`).join('\n')
     return `\n[⚡ Intervención del Usuario en Caliente — Considerar para este paso inmediato]:\n${formatted}\n`
   }
 
@@ -187,24 +187,30 @@ export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = 
   if (config.enabled === false) return
 
   // Hook tool execution lifecycle to dispatch orientative pills
-  ctx.on('tool/before-execute' as any, (event: any) => {
-    if (!event) return
-    const pill = generateStepPill(event.name || event.tool || 'tool', event.args || {})
-    ctx.emit('progress/step-pill' as any, pill)
+  ctx.on('tool/before-execute' as keyof Context.Events, (event: unknown) => {
+    if (!event || typeof event !== 'object') return
+    const ev = event as { name?: string; tool?: string; args?: Record<string, unknown> }
+    const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {})
+    ctx.emit('progress/step-pill' as keyof Context.Events, pill as unknown as never)
   })
 
-  ctx.on('tool/after-execute' as any, (event: any) => {
-    if (!event) return
-    if (event.error) {
-      const pill = generateStepPill(event.name || event.tool || 'tool', event.args || {}, event.error)
-      ctx.emit('progress/step-pill' as any, pill)
+  ctx.on('tool/after-execute' as keyof Context.Events, (event: unknown) => {
+    if (!event || typeof event !== 'object') return
+    const ev = event as { name?: string; tool?: string; args?: Record<string, unknown>; error?: unknown }
+    if (ev.error) {
+      const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {}, ev.error)
+      ctx.emit('progress/step-pill' as keyof Context.Events, pill as unknown as never)
     }
   })
 
   // Hook user input during active run
-  ctx.on('user/mid-turn-input' as any, (event: any) => {
-    if (event && event.sessionId && event.text) {
-      globalSteeringQueue.push(event.sessionId, event.text)
+  ctx.on('user/mid-turn-input' as keyof Context.Events, (event: unknown) => {
+    if (event && typeof event === 'object') {
+      const ev = event as { sessionId?: string; text?: string }
+      if (ev.sessionId && ev.text) {
+        globalSteeringQueue.push(ev.sessionId, ev.text)
+      }
     }
   })
 }
+

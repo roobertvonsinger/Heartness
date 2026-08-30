@@ -23,11 +23,11 @@ export function createKeepAliveSession(
   options: {
     intervalMs?: number
     pulseString?: string
-  } = {}
+  } = {},
 ): KeepAliveSession {
   const intervalMs = options.intervalMs ?? 15000
   const pulseString = options.pulseString ?? ': keep-alive\n\n'
-  
+
   let active = true
   let pulseCount = 0
   let timer: NodeJS.Timeout | null = null
@@ -35,7 +35,7 @@ export function createKeepAliveSession(
   const scheduleNext = () => {
     if (!active) return
     if (timer) clearTimeout(timer)
-    
+
     timer = setTimeout(() => {
       if (!active) return
       try {
@@ -93,13 +93,14 @@ export function registerKeepAliveGateway(ctx: Context, config: KeepAliveGatewayC
   })
 
   // Hook into agent/request to ensure active sessions maintain keep-alive
-  ctx.on('agent/request', async (session: any, next: () => Promise<void>) => {
+  ctx.on('agent/request', async (session: unknown, next: () => Promise<void>) => {
     let sessionPulse: KeepAliveSession | null = null
-    
-    if (session && typeof session.writeStream === 'function') {
+
+    if (session && typeof session === 'object' && 'writeStream' in session && typeof (session as { writeStream: (c: string) => void }).writeStream === 'function') {
+      const streamSession = session as { writeStream: (c: string) => void }
       sessionPulse = createKeepAliveSession(
-        (chunk) => session.writeStream(chunk),
-        { intervalMs, pulseString }
+        chunk => streamSession.writeStream(chunk),
+        { intervalMs, pulseString },
       )
     }
 

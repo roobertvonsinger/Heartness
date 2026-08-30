@@ -19,7 +19,6 @@ import { registerQualityAuditor } from './quality-auditor.ts'
 import { registerKeepAliveGateway } from './keep-alive-gateway.ts'
 import { registerStepFeedback } from './step-feedback.ts'
 import { registerToneGovernor } from './tone-governor.ts'
-import { SOVEREIGN_PRESETS, resolveSovereignPreset } from './presets.ts'
 
 export const name = 'sovereign-guard'
 export const Config = SovereignGuardConfig
