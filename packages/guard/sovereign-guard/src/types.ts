@@ -147,6 +147,28 @@ export interface HarnessTelemetryConfig {
   thresholds?: AnomalyThresholds
 }
 
+export interface KeepAliveGatewayConfig {
+  enabled?: boolean
+  intervalMs?: number
+  pulseString?: string
+}
+
+export interface StepFeedbackConfig {
+  enabled?: boolean
+  includeToolPills?: boolean
+  maxPillLength?: number
+  ephemeralStreaming?: boolean
+  hotSteeringEnabled?: boolean
+}
+
+export interface ToneGovernorConfig {
+  enabled?: boolean
+  stripSycophancy?: boolean
+  enforceEmpiricalFact?: boolean
+  enforceDirectMX?: boolean
+  antiSlopFilter?: boolean
+}
+
 export interface SovereignGuardConfig {
   contextIsolator?: ContextIsolatorConfig
   spillGuard?: SpillGuardConfig
@@ -157,6 +179,9 @@ export interface SovereignGuardConfig {
   optimizer?: AntigravityOptimizerConfig
   telemetry?: HarnessTelemetryConfig
   qualityAuditor?: QualityAuditorConfig
+  keepAlive?: KeepAliveGatewayConfig
+  stepFeedback?: StepFeedbackConfig
+  toneGovernor?: ToneGovernorConfig
 }
 
 export const ModelRule: z<ModelRule> = z.object({
@@ -282,6 +307,28 @@ export const HarnessTelemetryConfig: z<HarnessTelemetryConfig> = z.object({
   thresholds: AnomalyThresholds.default({}),
 })
 
+export const KeepAliveGatewayConfig: z<KeepAliveGatewayConfig> = z.object({
+  enabled: z.boolean().default(true),
+  intervalMs: z.number().default(15000),
+  pulseString: z.string().default(': keep-alive\n\n'),
+})
+
+export const StepFeedbackConfig: z<StepFeedbackConfig> = z.object({
+  enabled: z.boolean().default(true),
+  includeToolPills: z.boolean().default(true),
+  maxPillLength: z.number().default(100),
+  ephemeralStreaming: z.boolean().default(true),
+  hotSteeringEnabled: z.boolean().default(true),
+})
+
+export const ToneGovernorConfig: z<ToneGovernorConfig> = z.object({
+  enabled: z.boolean().default(true),
+  stripSycophancy: z.boolean().default(true),
+  enforceEmpiricalFact: z.boolean().default(true),
+  enforceDirectMX: z.boolean().default(true),
+  antiSlopFilter: z.boolean().default(true),
+})
+
 export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   contextIsolator: ContextIsolatorConfig.default({}),
   spillGuard: SpillGuardConfig.default({}),
@@ -292,5 +339,8 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   optimizer: AntigravityOptimizerConfig.default({}),
   telemetry: HarnessTelemetryConfig.default({}),
   qualityAuditor: QualityAuditorConfig.default({}),
+  keepAlive: KeepAliveGatewayConfig.default({}),
+  stepFeedback: StepFeedbackConfig.default({}),
+  toneGovernor: ToneGovernorConfig.default({}),
 })
 

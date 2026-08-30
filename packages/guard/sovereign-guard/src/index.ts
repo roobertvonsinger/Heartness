@@ -16,6 +16,11 @@ import { registerAntigravityOptimizer } from './antigravity-optimizer.ts'
 import { registerHarnessTelemetry } from './harness-telemetry.ts'
 import { registerQualityAuditor } from './quality-auditor.ts'
 
+import { registerKeepAliveGateway } from './keep-alive-gateway.ts'
+import { registerStepFeedback } from './step-feedback.ts'
+import { registerToneGovernor } from './tone-governor.ts'
+import { SOVEREIGN_PRESETS, resolveSovereignPreset } from './presets.ts'
+
 export const name = 'sovereign-guard'
 export const Config = SovereignGuardConfig
 
@@ -39,6 +44,9 @@ export type {
   QualityAuditorConfig,
   QualityMetrics,
   QualityAuditResult,
+  KeepAliveGatewayConfig,
+  StepFeedbackConfig,
+  ToneGovernorConfig,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'
@@ -50,6 +58,10 @@ export { calculateQualityScore, registerQualityAuditor } from './quality-auditor
 export { registerReflexiveAuditor } from './reflexive-auditor.ts'
 export { ResponseCache, matchRoutingRule, executeToolsInParallel, registerAntigravityOptimizer } from './antigravity-optimizer.ts'
 export { TelemetryCollector, registerHarnessTelemetry } from './harness-telemetry.ts'
+export { createKeepAliveSession, registerKeepAliveGateway } from './keep-alive-gateway.ts'
+export { generateStepPill, MidTurnSteeringQueue, globalSteeringQueue, registerStepFeedback } from './step-feedback.ts'
+export { sanitizeToneOutput, getSovereignSystemDirectives, registerToneGovernor } from './tone-governor.ts'
+export { SOVEREIGN_PRESETS, resolveSovereignPreset } from './presets.ts'
 
 export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerContextIsolator(ctx, config.contextIsolator ?? {})
@@ -61,4 +73,8 @@ export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerAntigravityOptimizer(ctx, config.optimizer ?? {})
   registerHarnessTelemetry(ctx, config.telemetry ?? {})
   registerQualityAuditor(ctx, config.qualityAuditor ?? {})
+  registerKeepAliveGateway(ctx, config.keepAlive ?? {})
+  registerStepFeedback(ctx, config.stepFeedback ?? {})
+  registerToneGovernor(ctx, config.toneGovernor ?? {})
 }
+
