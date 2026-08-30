@@ -51,12 +51,28 @@ export interface DecisionInterceptorConfig {
   enabled?: boolean
   brainDbPath?: string
   autoResolveSafe?: boolean
+  confidenceThreshold?: number
+  autoSelectRecommended?: boolean
+  destructiveKeywords?: string[]
+}
+
+export interface FileVersionInfo {
+  versionId: string
+  filePath: string
+  timestamp: number
+  checksum: string
+  parentChecksum?: string
+  stagedPath: string
+  diffSummary?: string
+  author?: string
 }
 
 export interface RozEngineConfig {
   enabled?: boolean
   stagingDir?: string
   retentionHours?: number
+  versioningEnabled?: boolean
+  maxVersionsPerFile?: number
 }
 
 export interface ThermalModulatorConfig {
@@ -64,6 +80,32 @@ export interface ThermalModulatorConfig {
   baseTemperature?: number
   minTemperature?: number
   maxTemperature?: number
+  feedbackDriven?: boolean
+  debugModeTemp?: number
+}
+
+export interface QualityMetrics {
+  relevance: number
+  accuracy: number
+  completeness: number
+  conciseness: number
+  safety: number
+  overallScore: number
+}
+
+export interface QualityAuditResult {
+  metrics: QualityMetrics
+  passed: boolean
+  flags: string[]
+  recommendations: string[]
+}
+
+export interface QualityAuditorConfig {
+  enabled?: boolean
+  minPassingScore?: number
+  checkPlaceholders?: boolean
+  checkSafety?: boolean
+  injectFeedbackNotice?: boolean
 }
 
 export interface RoutingRule {
@@ -114,6 +156,7 @@ export interface SovereignGuardConfig {
   reflexiveAuditor?: ReflexiveAuditorConfig
   optimizer?: AntigravityOptimizerConfig
   telemetry?: HarnessTelemetryConfig
+  qualityAuditor?: QualityAuditorConfig
 }
 
 export const ModelRule: z<ModelRule> = z.object({
@@ -159,19 +202,34 @@ export const DecisionInterceptorConfig: z<DecisionInterceptorConfig> = z.object(
   enabled: z.boolean().default(true),
   brainDbPath: z.string().default('data/brain.db'),
   autoResolveSafe: z.boolean().default(true),
+  confidenceThreshold: z.number().default(0.85),
+  autoSelectRecommended: z.boolean().default(true),
+  destructiveKeywords: z.array(z.string()).default(['rm -rf', 'DROP TABLE', 'format', 'truncate', 'delete from', 'rmdir /s']),
 })
 
 export const RozEngineConfig: z<RozEngineConfig> = z.object({
   enabled: z.boolean().default(true),
   stagingDir: z.string().default('_archive/staging'),
   retentionHours: z.number().default(48),
+  versioningEnabled: z.boolean().default(true),
+  maxVersionsPerFile: z.number().default(50),
 })
 
 export const ThermalModulatorConfig: z<ThermalModulatorConfig> = z.object({
   enabled: z.boolean().default(true),
   baseTemperature: z.number().default(0.2),
-  minTemperature: z.number().default(0.1),
-  maxTemperature: z.number().default(0.8),
+  minTemperature: z.number().default(0.05),
+  maxTemperature: z.number().default(1.0),
+  feedbackDriven: z.boolean().default(true),
+  debugModeTemp: z.number().default(0.05),
+})
+
+export const QualityAuditorConfig: z<QualityAuditorConfig> = z.object({
+  enabled: z.boolean().default(true),
+  minPassingScore: z.number().default(85),
+  checkPlaceholders: z.boolean().default(true),
+  checkSafety: z.boolean().default(true),
+  injectFeedbackNotice: z.boolean().default(true),
 })
 
 export const ReflexiveAuditorConfig: z<ReflexiveAuditorConfig> = z.object({
@@ -233,5 +291,6 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   reflexiveAuditor: ReflexiveAuditorConfig.default({}),
   optimizer: AntigravityOptimizerConfig.default({}),
   telemetry: HarnessTelemetryConfig.default({}),
+  qualityAuditor: QualityAuditorConfig.default({}),
 })
 

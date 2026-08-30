@@ -1,15 +1,22 @@
+import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import type { RozEngineConfig } from './types.ts'
+import type { FileVersionInfo, RozEngineConfig } from './types.ts'
 
 export class RozRecycleEngine {
   private stagingDir: string
   private retentionMs: number
+  private versioningEnabled: boolean
+  private maxVersionsPerFile: number
+  private manifestPath: string
 
-  constructor(stagingDir = '_archive/staging', retentionHours = 48) {
+  constructor(stagingDir = '_archive/staging', retentionHours = 48, versioningEnabled = true, maxVersionsPerFile = 50) {
     this.stagingDir = stagingDir
     this.retentionMs = retentionHours * 60 * 60 * 1000
+    this.versioningEnabled = versioningEnabled
+    this.maxVersionsPerFile = maxVersionsPerFile
+    this.manifestPath = join(stagingDir, 'versions', 'manifest.json')
     this.ensureStaging()
   }
 
@@ -20,6 +27,28 @@ export class RozRecycleEngine {
       } catch {
         // best effort
       }
+    }
+  }
+
+  private loadManifest(): Record<string, FileVersionInfo[]> {
+    try {
+      if (existsSync(this.manifestPath)) {
+        const raw = readFileSync(this.manifestPath, 'utf-8')
+        return JSON.parse(raw)
+      }
+    } catch {
+      // fallback
+    }
+    return {}
+  }
+
+  private saveManifest(manifest: Record<string, FileVersionInfo[]>): void {
+    try {
+      const dir = join(this.stagingDir, 'versions')
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      writeFileSync(this.manifestPath, JSON.stringify(manifest, null, 2), 'utf-8')
+    } catch {
+      // best effort
     }
   }
 
@@ -37,14 +66,103 @@ export class RozRecycleEngine {
       const targetName = `${base}.${timestamp}.bak`
       const targetPath = join(dayDir, targetName)
       copyFileSync(filePath, targetPath)
+
+      if (this.versioningEnabled) {
+        this.createFileVersion(filePath, 'auto-backup')
+      }
+
       return targetPath
     } catch {
       return undefined
     }
   }
 
+  /** Create an immutable versioned snapshot with parent checksum tracking */
+  public createFileVersion(filePath: string, author = 'antigravity'): FileVersionInfo | undefined {
+    if (!existsSync(filePath)) return undefined
+    try {
+      const content = readFileSync(filePath, 'utf-8')
+      const checksum = createHash('sha256').update(content, 'utf-8').digest('hex')
+      const normalizedPath = resolve(filePath)
+
+      const manifest = this.loadManifest()
+      const history = manifest[normalizedPath] ?? []
+      const latest = history[history.length - 1]
+      const parentChecksum = latest?.checksum
+
+      // If checksum is identical to latest version, skip redundant duplicate
+      if (parentChecksum === checksum && history.length > 0) {
+        return latest
+      }
+
+      const timestamp = Date.now()
+      const versionId = `v${history.length + 1}_${timestamp}`
+      const versionsDir = join(this.stagingDir, 'versions', 'snapshots')
+      if (!existsSync(versionsDir)) mkdirSync(versionsDir, { recursive: true })
+
+      const base = basename(filePath)
+      const targetName = `${base}.${versionId}.snapshot`
+      const targetPath = join(versionsDir, targetName)
+      writeFileSync(targetPath, content, 'utf-8')
+
+      // Calculate diff summary against parent
+      let diffSummary = `Initial version (${content.split('\n').length} lines)`
+      if (latest && existsSync(latest.stagedPath)) {
+        const oldContent = readFileSync(latest.stagedPath, 'utf-8')
+        const oldLines = oldContent.split('\n').length
+        const newLines = content.split('\n').length
+        diffSummary = `Diff: ${newLines - oldLines >= 0 ? '+' : ''}${newLines - oldLines} lines (parent ${latest.checksum.slice(0, 8)})`
+      }
+
+      const versionInfo: FileVersionInfo = {
+        versionId,
+        filePath: normalizedPath,
+        timestamp,
+        checksum,
+        parentChecksum,
+        stagedPath: targetPath,
+        diffSummary,
+        author,
+      }
+
+      history.push(versionInfo)
+      if (history.length > this.maxVersionsPerFile) {
+        history.shift()
+      }
+      manifest[normalizedPath] = history
+      this.saveManifest(manifest)
+
+      return versionInfo
+    } catch {
+      return undefined
+    }
+  }
+
+  /** List version history for a file */
+  public listFileVersions(filePath: string): FileVersionInfo[] {
+    const normalizedPath = resolve(filePath)
+    const manifest = this.loadManifest()
+    return manifest[normalizedPath] ?? []
+  }
+
+  /** Rollback file to a specific historical version */
+  public rollbackFileVersion(filePath: string, versionId: string): boolean {
+    const versions = this.listFileVersions(filePath)
+    const target = versions.find(v => v.versionId === versionId)
+    if (!target || !existsSync(target.stagedPath)) return false
+
+    try {
+      const content = readFileSync(target.stagedPath, 'utf-8')
+      writeFileSync(filePath, content, 'utf-8')
+      this.createFileVersion(filePath, `rollback-to-${versionId}`)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   /** Back up conversational context messages or summary data */
-  public backupContextData(contextId: string, data: any): string | undefined {
+  public backupContextData(contextId: string, data: unknown): string | undefined {
     try {
       const today = new Date().toISOString().slice(0, 10)
       const contextDir = join(this.stagingDir, 'contexts', today)
@@ -63,11 +181,11 @@ export class RozRecycleEngine {
   }
 
   /** Restore contextual data from backup */
-  public restoreContextData(filePath: string): any | undefined {
+  public restoreContextData(filePath: string): Record<string, unknown> | undefined {
     try {
       if (existsSync(filePath)) {
         const content = readFileSync(filePath, 'utf-8')
-        return JSON.parse(content)
+        return JSON.parse(content) as Record<string, unknown>
       }
       return undefined
     } catch {
@@ -87,7 +205,9 @@ export class RozRecycleEngine {
         for (const entry of entries) {
           const fullPath = join(dir, entry.name)
           if (entry.isDirectory()) {
-            scanAndClean(fullPath)
+            if (entry.name !== 'versions') {
+              scanAndClean(fullPath)
+            }
           } else if (entry.isFile()) {
             const stat = statSync(fullPath)
             if (now - stat.mtimeMs > this.retentionMs) {
@@ -106,12 +226,14 @@ export class RozRecycleEngine {
   }
 }
 
-export function registerRozEngine(_ctx: Context, config: RozEngineConfig): RozRecycleEngine | undefined {
+export function registerRozEngine(_ctx: Context, config: RozEngineConfig = {}): RozRecycleEngine | undefined {
   if (config.enabled === false) return undefined
 
   const stagingDir = config.stagingDir ?? '_archive/staging'
   const retentionHours = config.retentionHours ?? 48
-  const engine = new RozRecycleEngine(stagingDir, retentionHours)
+  const versioningEnabled = config.versioningEnabled !== false
+  const maxVersions = config.maxVersionsPerFile ?? 50
+  const engine = new RozRecycleEngine(stagingDir, retentionHours, versioningEnabled, maxVersions)
 
   // Run initial cleanup
   engine.purgeExpired()

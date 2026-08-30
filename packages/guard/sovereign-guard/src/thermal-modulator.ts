@@ -58,34 +58,55 @@ export function calculateSyntacticWeight(text: string): { score: number; metrics
 }
 
 /**
- * Registers dynamic thermal and sampling scaling based on prompt syntactic weight.
+ * Registers dynamic thermal and sampling scaling based on prompt syntactic weight
+ * and recent conversational feedback (e.g. deterministic debug temperature on error).
  */
 export function registerThermalModulator(ctx: Context, config: ThermalModulatorConfig = {}): void {
   if (config.enabled === false) return
 
-  const minTemp = config.minTemperature ?? 0.1
-  const maxTemp = config.maxTemperature ?? 0.8
+  const minTemp = config.minTemperature ?? 0.05
+  const maxTemp = config.maxTemperature ?? 1.0
   const baseTemp = config.baseTemperature ?? 0.2
+  const feedbackDriven = config.feedbackDriven !== false
+  const debugModeTemp = config.debugModeTemp ?? 0.05
 
   ctx.on('agent/request', async (payload: any, next: any): Promise<LlmCallConfig> => {
     const callConfig: LlmCallConfig = typeof next === 'function' ? await next() : payload?.config ?? {}
     const agent = payload?.agent
 
-    // Extract raw user prompt from agent or session history
+    // Extract raw user prompt and inspect recent message history
     let rawPrompt = ''
+    let recentHasErrors = false
+
     try {
       const messages = agent?.messages ?? agent?.session?.messages ?? []
       for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i]
-        if (msg?.source?.kind === 'user' || msg?.role === 'user') {
+        if (!rawPrompt && (msg?.source?.kind === 'user' || msg?.role === 'user')) {
           for (const block of msg.content ?? []) {
             if (block.type === 'text') rawPrompt += ' ' + block.text
           }
-          if (rawPrompt) break
+        }
+
+        // Check if previous 2 turns contained actual tool failures or execution errors (ignore user prompt text)
+        if (feedbackDriven && i >= messages.length - 2 && msg?.source?.kind !== 'user' && msg?.role !== 'user') {
+          for (const block of msg?.content ?? []) {
+            if (block.type === 'text' && /\b(error|exception|failed|fatal|uncaught|assertionerror)\b/i.test(block.text)) {
+              recentHasErrors = true
+            }
+          }
         }
       }
     } catch {
       // best-effort fallback
+    }
+
+    // Feedback-driven debug override: if recent turns failed, use strict deterministic temperature
+    if (recentHasErrors) {
+      return {
+        ...callConfig,
+        temperature: debugModeTemp,
+      }
     }
 
     if (!rawPrompt) return callConfig

@@ -14,6 +14,7 @@ import { registerThermalModulator } from './thermal-modulator.ts'
 import { registerReflexiveAuditor } from './reflexive-auditor.ts'
 import { registerAntigravityOptimizer } from './antigravity-optimizer.ts'
 import { registerHarnessTelemetry } from './harness-telemetry.ts'
+import { registerQualityAuditor } from './quality-auditor.ts'
 
 export const name = 'sovereign-guard'
 export const Config = SovereignGuardConfig
@@ -26,6 +27,7 @@ export type {
   SpillMetadata,
   DecisionInterceptorConfig,
   RozEngineConfig,
+  FileVersionInfo,
   ThermalModulatorConfig,
   ReflexiveAuditorConfig,
   AntigravityOptimizerConfig,
@@ -34,12 +36,17 @@ export type {
   ParallelToolConfig,
   HarnessTelemetryConfig,
   AnomalyThresholds,
+  QualityAuditorConfig,
+  QualityMetrics,
+  QualityAuditResult,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'
 export { calculateSyntacticWeight } from './thermal-modulator.ts'
 export { calculateAdaptiveMultiplier } from './context-isolator.ts'
 export { extractSemanticExcerpts, readSpillMetadata } from './spill-guard.ts'
+export { evaluateToolSafety } from './decision-interceptor.ts'
+export { calculateQualityScore, registerQualityAuditor } from './quality-auditor.ts'
 export { registerReflexiveAuditor } from './reflexive-auditor.ts'
 export { ResponseCache, matchRoutingRule, executeToolsInParallel, registerAntigravityOptimizer } from './antigravity-optimizer.ts'
 export { TelemetryCollector, registerHarnessTelemetry } from './harness-telemetry.ts'
@@ -53,5 +60,5 @@ export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerReflexiveAuditor(ctx, config.reflexiveAuditor ?? {})
   registerAntigravityOptimizer(ctx, config.optimizer ?? {})
   registerHarnessTelemetry(ctx, config.telemetry ?? {})
+  registerQualityAuditor(ctx, config.qualityAuditor ?? {})
 }
-
