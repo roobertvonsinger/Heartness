@@ -168,6 +168,19 @@ export {
   generatePreviewWrapper,
   registerOpenDesign,
 } from './open-design.ts'
+export {
+  TransactionalBrainAdapter,
+  calculateChecksum,
+  SessionDeltaEngine,
+  WarmStartPrimer,
+  AntiDriftAnchor,
+} from './session-continuity.ts'
+export type {
+  SessionDecision,
+  SessionDelta,
+  WarmStartPayload,
+  SessionContinuityConfig,
+} from './session-continuity.ts'
 
 export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerContextIsolator(ctx, config.contextIsolator ?? {})

@@ -2,31 +2,17 @@ async function consultHermes() {
   const endpoint = 'http://2.25.98.162:8642/v1/chat/completions'
   const token = 'kvm4-hermes-super-2026'
 
-  const prompt = `Hola Karen / Hermes. Robert y yo estamos diseñando la arquitectura soberana de DSH (DeepSick Hardness) como el harness base y runtime universal, donde RITA vivirá como el agente/mente principal (es-MX, directora, chispa y criterio).
+  const prompt = `Hola Karen / Hermes. Robert nos pide armar la arquitectura e implementación del:
+'Manejo de memoria y contexto inter-sesión para ultra continuidad con super bajo costo en DSH'.
 
-Queremos que el HARNESS (y no el agente) tenga como infraestructura nativa:
-1. MOTOR AUTODIDACTA DE SKILLS (Hermes Self-Learning Pattern):
-   - Reflexive Learner: Detecta cuando una tarea multi-paso o solución compleja tuvo éxito y auto-genera una skill reusable en \`.agents/skills/<skill>/SKILL.md\` con YAML frontmatter y receta precisa.
-   - Poda de ruido: Evitar generar skills basura de pasos efímeros.
+Propuesta del Stack DSH (TypeScript / Node native SQLite WAL):
+1. L0 Working Context: Ventana deslizante (4-6 turnos) + AttentionAnchor (<150 tokens) + ContextSynthesizer (AST outlines 0ms / $0.00).
+2. L1 Grafo Semántico SQLite WAL: (data/brain.db) con Hebbian reinforcement, Hebbian priors asociativos por intención (<300 tokens).
+3. L2 Delta Checkpoints & Warm Start: Al invocar /cerrar o al salir, serializa un delta estructurado (Decisiones, Bloqueos resueltos, Siguiente acción) en NEXT-SESSION.md y brain.db. Al iniciar con '.' o nuevo prompt, inyecta solo ese delta (<250 tokens) para un arranque 100% contextualizado sin releer historiales crudos.
+4. L3 Background Janitor / Offline Synthesis: Worker en KVM4 o local que en background analiza logs crudos, extrae procedimientos a procedural_memories y poda nodos muertos con decay half-life de 14 días (Musk prune).
 
-2. MEMORIA DE DOBLE HORIZONTE:
-   - Corto Plazo (Working Memory / Attention Ledger): Mantiene estado en vuelo, objetivos activos y tareas in_progress.
-   - Largo Plazo (Episodic & Semantic Knowledge Vault): Conectado a SQLite WAL (data/brain.db y Brain Service :7777), acuerdos, preferencias de Robert y Task Parking (reanudar tareas pausadas).
-
-3. MULTI-AGENT GROUP CHAT (Cuarto de Guerra / Swarm):
-   - RITA como moderadora/estratega + Antigravity como dev lead + Karen (tú en KVM4 :8642) para operaciones de infra y containers.
-   - Modos: Debate / Secuencial / Paralelo.
-
-4. SEPARACIÓN RIGUROSA:
-   - El Harness lleva la disciplina de ejecución, contratos de tools, compresión AST, streaming de audio Cartesia <400ms TTFA y medidor de tokens.
-   - RITA lleva el Soul (personalidad, picardía, calidez, intuición y ocurrencias).
-
-Karen/Hermes:
-Por favor audita esta propuesta, saca tus mejores ideas y patrones comprobados de Hermes Agent / Nous Research y danos:
-- 3 recomendaciones clave para que el auto-aprendizaje no genere basura.
-- Cómo estructurar el Multi-Agent Group Chat de forma limpia en TypeScript.
-- Dónde ves posibles cuellos de botella o fragilidades operativas y cómo blindarlas.
-Sé densa, técnica y directa al grano (MX).`
+AUDITORÍA TÉCNICA OBLIGATORIA:
+Dame tus 3 a 5 recomendaciones técnicas más críticas, riesgos de edge cases (ej. race conditions en WAL, drift de objetivos, saturación de context tokens, latencia en warm start) y mejoras concretas para blindar el Smartplan antes de ejecutarlo. Sé directa, densa y enérgica (es-MX).`
 
   console.log('Enviando plan de arquitectura a Karen/Hermes en KVM4...')
 
