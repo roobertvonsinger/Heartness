@@ -183,4 +183,40 @@ describe('Sovereign Guard Suite', () => {
       expect(complexConfig.temperature).toBeGreaterThan(0.5)
     })
   })
+
+  describe('Reflexive Auditor (Critic Interceptor)', () => {
+    it('audits session every 3 turns and injects guidance without breaking the loop', async () => {
+      const ctx = new Context()
+      SovereignGuard.apply(ctx, {
+        reflexiveAuditor: {
+          enabled: true,
+          intervalTurns: 3,
+        },
+      })
+
+      const agent = { id: 'agent-audit-01' }
+      const mockMessages = [
+        createUserMessage({ content: [{ type: 'text', text: 'Step 1: start' }], source: { kind: 'user' } }),
+      ]
+
+      // Turn 1: no audit notice
+      const t1 = await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages }, () => ({ kind: 'enter', messages: mockMessages }))
+      expect(t1.kind).toBe('enter')
+      if (t1.kind === 'enter') expect(t1.messages.length).toBe(1)
+
+      // Turn 2: no audit notice
+      const t2 = await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages }, () => ({ kind: 'enter', messages: mockMessages }))
+      expect(t2.kind).toBe('enter')
+      if (t2.kind === 'enter') expect(t2.messages.length).toBe(1)
+
+      // Turn 3: triggers audit
+      const t3 = await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages }, () => ({ kind: 'enter', messages: mockMessages }))
+      expect(t3.kind).toBe('enter')
+      if (t3.kind === 'enter') {
+        expect(t3.messages.length).toBe(2)
+        const auditBlock = t3.messages[1].content[0]
+        expect(auditBlock.type === 'text' ? auditBlock.text : '').toContain('REFLEXIVE AUDITOR - Turn 3')
+      }
+    })
+  })
 })

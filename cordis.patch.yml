@@ -132,3 +132,7 @@
           baseTemperature: 0.2
           minTemperature: 0.1
           maxTemperature: 0.8
+        reflexiveAuditor:
+          enabled: true
+          intervalTurns: 3
+          maxAuditsPerSession: 20

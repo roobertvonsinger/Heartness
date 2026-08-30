@@ -39,12 +39,19 @@ export interface ThermalModulatorConfig {
   maxTemperature?: number
 }
 
+export interface ReflexiveAuditorConfig {
+  enabled?: boolean
+  intervalTurns?: number
+  maxAuditsPerSession?: number
+}
+
 export interface SovereignGuardConfig {
   contextIsolator?: ContextIsolatorConfig
   spillGuard?: SpillGuardConfig
   decisionInterceptor?: DecisionInterceptorConfig
   rozEngine?: RozEngineConfig
   thermalModulator?: ThermalModulatorConfig
+  reflexiveAuditor?: ReflexiveAuditorConfig
 }
 
 export const ModelRule: z<ModelRule> = z.object({
@@ -92,10 +99,17 @@ export const ThermalModulatorConfig: z<ThermalModulatorConfig> = z.object({
   maxTemperature: z.number().default(0.8),
 })
 
+export const ReflexiveAuditorConfig: z<ReflexiveAuditorConfig> = z.object({
+  enabled: z.boolean().default(true),
+  intervalTurns: z.number().default(3),
+  maxAuditsPerSession: z.number().default(20),
+})
+
 export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   contextIsolator: ContextIsolatorConfig.default({}),
   spillGuard: SpillGuardConfig.default({}),
   decisionInterceptor: DecisionInterceptorConfig.default({}),
   rozEngine: RozEngineConfig.default({}),
   thermalModulator: ThermalModulatorConfig.default({}),
+  reflexiveAuditor: ReflexiveAuditorConfig.default({}),
 })

@@ -11,6 +11,7 @@ import { registerSpillGuard } from './spill-guard.ts'
 import { registerDecisionInterceptor } from './decision-interceptor.ts'
 import { registerRozEngine } from './roz-engine.ts'
 import { registerThermalModulator } from './thermal-modulator.ts'
+import { registerReflexiveAuditor } from './reflexive-auditor.ts'
 
 export const name = 'sovereign-guard'
 export const Config = SovereignGuardConfig
@@ -22,10 +23,12 @@ export type {
   DecisionInterceptorConfig,
   RozEngineConfig,
   ThermalModulatorConfig,
+  ReflexiveAuditorConfig,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'
 export { calculateSyntacticWeight } from './thermal-modulator.ts'
+export { registerReflexiveAuditor } from './reflexive-auditor.ts'
 
 export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerContextIsolator(ctx, config.contextIsolator ?? {})
@@ -33,4 +36,5 @@ export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerDecisionInterceptor(ctx, config.decisionInterceptor ?? {})
   registerRozEngine(ctx, config.rozEngine ?? {})
   registerThermalModulator(ctx, config.thermalModulator ?? {})
+  registerReflexiveAuditor(ctx, config.reflexiveAuditor ?? {})
 }
