@@ -1,0 +1,13 @@
+{
+  "transcript": "Hola Robert, todo en orden.",
+  "model_id": "sonic-3.6",
+  "voice": {
+    "mode": "id",
+    "id": "1cc00672-e9d4-455e-b3fb-31dfb7aad231"
+  },
+  "output_format": {
+    "container": "mp3",
+    "sample_rate": 44100
+  },
+  "language": "es"
+}

@@ -23,9 +23,18 @@ import {
 import {
   cleanMarkdownForSpeech,
   extractDualTrackPayload,
+  parseVoiceTagAttributes,
+  normalizeCartesiaEmotion,
+  buildCartesiaWebSocketPayload,
+  buildElevenLabsPayload,
+  generateToolSpeechAnnouncement,
 } from '../src/voice-gateway.ts'
+import {
+  VoiceAudioCache,
+  VoiceQuotaGuard,
+} from '../src/voice-guard.ts'
 
-describe('Omni-Sovereign Multi-Brain Suite (DSH #22 - #27)', () => {
+describe('Omni-Sovereign Multi-Brain Suite (DSH #22 - #28)', () => {
   describe('#22 Invisible Context Synthesizer', () => {
     it('extrae firmas AST y estructura sin llamadas externas (0ms)', () => {
       const codeSample = `
@@ -150,21 +159,42 @@ export const logger = { level: 'info' }
     })
   })
 
-  describe('#25 Attention Anchor', () => {
-    it('mantiene el foco activo inmutable y registra progreso', () => {
+  describe('#25 Attention Anchor & Live Checklist', () => {
+    it('mantiene el foco activo inmutable y renderiza la checklist de ejecución viva', () => {
       const ledger = new AttentionLedger('Construcción de Suite Omni-Brain DSH')
       ledger.addConstraint('100% Tests Verdes en Vitest')
-      ledger.addMilestone('Crear sintetizador', true)
-      ledger.addMilestone('Crear tests', false)
+      ledger.setTasks([
+        { content: 'Definir interfaces de VoiceGuard', status: 'completed' },
+        { content: 'Implementar VoiceAudioCache deduplicado', status: 'in_progress' },
+        { content: 'Conectar directivas de TODO lists', status: 'pending' },
+        { content: 'Validar con tests unitarios', status: 'pending' },
+        { content: 'Verificar en sesión en vivo', status: 'pending' },
+      ])
       ledger.trackActiveFile('src/context-synthesizer.ts')
       ledger.incrementTurn()
 
       const header = ledger.renderAnchorHeader()
-      expect(header).toContain('[⚓ ATTENTION ANCHOR — FOCO ACTIVO INMUTABLE (Turno #1)]')
+      expect(header).toContain('[⚓ ATTENTION ANCHOR & CHECKLIST VIVA')
       expect(header).toContain('Construcción de Suite Omni-Brain DSH')
-      expect(header).toContain('100% Tests Verdes en Vitest')
-      expect(header).toContain('[Completados: 1] [Pendientes: 1]')
+      expect(header).toContain('• CHECKLIST DE EJECUCIÓN:')
+      expect(header).toContain('[x] 1. Definir interfaces de VoiceGuard')
+      expect(header).toContain('[>] 2. Implementar VoiceAudioCache deduplicado (⚡ EN PROGRESO)')
+      expect(header).toContain('[ ] 3. Conectar directivas de TODO lists')
       expect(header).toContain('src/context-synthesizer.ts')
+    })
+
+    it('actualiza dinámicamente el estado de las tareas de la checklist', () => {
+      const ledger = new AttentionLedger()
+      ledger.setTasks([
+        { content: 'Paso uno', status: 'pending' },
+        { content: 'Paso dos', status: 'pending' },
+      ])
+
+      expect(ledger.updateTaskStatus('Paso uno', 'in_progress')).toBe(true)
+      expect(ledger.getTasks()[0]?.status).toBe('in_progress')
+
+      expect(ledger.updateTaskStatus('Paso uno', 'completed')).toBe(true)
+      expect(ledger.getTasks()[0]?.status).toBe('completed')
     })
   })
 
@@ -234,11 +264,123 @@ Robert, la auditoría quedó impecable. Los ochenta y tres tests pasaron en verd
       expect(result.provider).toBe('cartesia')
     })
 
-    it('soporta ElevenLabs como proveedor de voz alternativo', () => {
-      const response = '<voice>Todo en orden con ElevenLabs.</voice> Detalle escrito.'
-      const result = extractDualTrackPayload(response, { provider: 'elevenlabs' })
+    it('parsea atributos de expresividad en la etiqueta <voice>', () => {
+      const tag = 'emotion="curious" speed="1.15" stability="0.35" style="0.8" provider="cartesia"'
+      const mods = parseVoiceTagAttributes(tag)
+      expect(mods.emotion).toBe('curious')
+      expect(mods.speed).toBe(1.15)
+      expect(mods.stability).toBe(0.35)
+      expect(mods.style).toBe(0.8)
+      expect(mods.provider).toBe('cartesia')
+    })
+
+    it('normaliza emociones e intensidades nativas para Cartesia Sonic 3.6', () => {
+      expect(normalizeCartesiaEmotion('curious')).toEqual(['curiosity', 'high'])
+      expect(normalizeCartesiaEmotion('positivity:high')).toEqual(['positivity', 'high'])
+      expect(normalizeCartesiaEmotion('urgent')).toEqual(['anger', 'low'])
+      expect(normalizeCartesiaEmotion('excited')).toEqual(['excitement', 'high'])
+      expect(normalizeCartesiaEmotion('calm')).toEqual(['neutral', 'low'])
+    })
+
+    it('genera payload wire-ready de Cartesia WebSocket con controles experimentales y formato PCM', () => {
+      const mods = { emotion: 'curious', speed: 1.1, voiceId: '1cc00672-e9d4-455e-b3fb-31dfb7aad231' }
+      const payload = buildCartesiaWebSocketPayload('Ojo Robert, analicé el endpoint.', {}, mods, 'sess_123')
+      expect(payload.model_id).toBe('sonic-3.6')
+      expect(payload.voice.id).toBe('1cc00672-e9d4-455e-b3fb-31dfb7aad231')
+      expect(payload.voice.experimental_controls?.speed).toBe(1.1)
+      expect(payload.voice.experimental_controls?.emotion).toEqual(['curiosity', 'high'])
+      expect(payload.output_format.encoding).toBe('pcm_s16le')
+      expect(payload.output_format.sample_rate).toBe(44100)
+      expect(payload.context_id).toBe('sess_123')
+      expect(payload.continue).toBe(true)
+    })
+
+    it('genera payload wire-ready de ElevenLabs con voice_settings de expresividad', () => {
+      const mods = { stability: 0.35, style: 0.85, similarityBoost: 0.9, speed: 1.05 }
+      const payload = buildElevenLabsPayload('Todo en orden con el refactor.', {}, mods)
+      expect(payload.model_id).toBe('eleven_turbo_v2_5')
+      expect(payload.voice_settings.stability).toBe(0.35)
+      expect(payload.voice_settings.style).toBe(0.85)
+      expect(payload.voice_settings.similarity_boost).toBe(0.9)
+      expect(payload.voice_settings.speed).toBe(1.05)
+      expect(payload.voice_settings.use_speaker_boost).toBe(true)
+    })
+
+    it('extrae dinámicamente el canal dual con modificadores inline en el mensaje', () => {
+      const msg = `
+# Diagnóstico
+Falla en puerto 9000.
+<voice emotion="urgent" speed="1.1" provider="elevenlabs" stability="0.4" style="0.7">
+Ojo Robert, detecté que el puerto nueve mil no respondió en KVM4.
+</voice>
+`
+      const result = extractDualTrackPayload(msg, { provider: 'auto_failover' })
+      expect(result.hasExplicitVoiceTag).toBe(true)
       expect(result.provider).toBe('elevenlabs')
-      expect(result.ttsProfile.modelId).toBe('eleven_turbo_v2_5')
+      expect(result.modifiers.emotion).toBe('urgent')
+      expect(result.modifiers.speed).toBe(1.1)
+      expect(result.modifiers.stability).toBe(0.4)
+      expect(result.elevenlabsPayload?.voice_settings.stability).toBe(0.4)
+      expect(result.elevenlabsPayload?.voice_settings.style).toBe(0.7)
+    })
+
+    it('realiza expansión fonética conversacional para términos técnicos en español mexicano', () => {
+      const raw = 'Tenemos 100% de cobertura con 0 errores en TDD y la API de SQL v2.5.'
+      const clean = cleanMarkdownForSpeech(raw)
+      expect(clean).toContain('cien por ciento')
+      expect(clean).toContain('cero errores')
+      expect(clean).toContain('t-d-d')
+      expect(clean).toContain('a-p-i')
+      expect(clean).toContain('ese-cu-ele')
+      expect(clean).toContain('versión 2 punto 5')
+    })
+  })
+
+  describe('#28 Sovereign Voice Guard & Quota Shield', () => {
+    it('almacena y recupera buffers de audio en caché por hash SHA-256 (0ms / $0)', () => {
+      const cache = new VoiceAudioCache(10)
+      const key = VoiceAudioCache.createKey('Inspeccionando types.ts...', 'cartesia', 'voice_1', 'neutral', 1.0)
+      const dummyBuffer = Buffer.from('fake-audio-bytes')
+
+      cache.set(key, dummyBuffer, 'mp3')
+      expect(cache.has(key)).toBe(true)
+
+      const entry = cache.get(key)
+      expect(entry?.buffer).toEqual(dummyBuffer)
+      expect(entry?.hitCount).toBe(2) // 1 de creación + 1 de get
+    })
+
+    it('bloquea síntesis de respuestas triviales ahorrando 100% de llamadas a la API', () => {
+      const guard = new VoiceQuotaGuard({ skipTrivialSpeech: true })
+      const reportOk = guard.evaluateSpeechEconomy('Ok.')
+      expect(reportOk.allowed).toBe(false)
+      expect(reportOk.skipReason).toBe('trivial_boilerplate_response')
+
+      const reportEmpty = guard.evaluateSpeechEconomy('   ')
+      expect(reportEmpty.allowed).toBe(false)
+      expect(reportEmpty.skipReason).toBe('trivial_empty_or_too_short')
+    })
+
+    it('condensa dinámicamente monólogos largos a oraciones de alto impacto sin cortar palabras', () => {
+      const guard = new VoiceQuotaGuard({ maxCharsPerTurn: 120, enforceAdvisoryConciseness: true })
+      const longMonologue = 'Ojo Robert, encontramos una discrepancia en los tipos. La compilación falló en la línea 40. Debemos ajustar la interfaz antes de continuar con los tests unitarios.'
+      const report = guard.evaluateSpeechEconomy(longMonologue)
+
+      expect(report.allowed).toBe(true)
+      expect(report.processedLength).toBeLessThanOrEqual(120)
+      expect(report.savedChars).toBeGreaterThan(0)
+      expect(report.processedText).toContain('Ojo Robert, encontramos una discrepancia en los tipos.')
+    })
+
+    it('genera micro-avisos orales orientativos durante ejecución de herramientas (Claude Code style)', () => {
+      const tscPing = generateToolSpeechAnnouncement('run_command', { CommandLine: 'npx tsc --noEmit' })
+      expect(tscPing).toBe('Compilando y verificando tipos de TypeScript...')
+
+      const vitestPing = generateToolSpeechAnnouncement('execute_bash', { CommandLine: 'npx vitest run' })
+      expect(vitestPing).toBe('Corriendo la suite de pruebas unitarias...')
+
+      const filePing = generateToolSpeechAnnouncement('replace_file_content', { TargetFile: 'src/types.ts' })
+      expect(filePing).toBe('Aplicando cambios en types.ts...')
     })
   })
 })

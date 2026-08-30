@@ -1,4 +1,4 @@
-# Cordis Profile Patch para DeepSeek Harness (DSH) — Stack Real Robert
+# Cordis Profile Patch para DeepSick Hardness (DSH) — Stack Real Robert
 # Topología Calibrada: Gemini (Workhorse 95%) + Mistral/Venice (Estratégico Sin Guardrails) + DeepSeek Direct + Sovereign Guard Suite
 
 - id: llm-pi-ai
@@ -114,25 +114,76 @@
               maxInputChars: 1000000
         spillGuard:
           enabled: true
-          maxLines: 100
-          maxBytes: 8192
-          headLines: 25
-          tailLines: 25
+          maxLines: 200
+          maxBytes: 16384
+          headLines: 30
+          tailLines: 30
           stagingDir: _archive/staging/spills
+          semanticExcerpting: true
         decisionInterceptor:
           enabled: true
           brainDbPath: data/brain.db
           autoResolveSafe: true
+          confidenceThreshold: 0.85
+          autoSelectRecommended: true
         rozEngine:
           enabled: true
           stagingDir: _archive/staging
           retentionHours: 48
+          versioningEnabled: true
         thermalModulator:
           enabled: true
           baseTemperature: 0.2
-          minTemperature: 0.1
-          maxTemperature: 0.8
+          minTemperature: 0.05
+          maxTemperature: 1.0
+          feedbackDriven: true
         reflexiveAuditor:
           enabled: true
           intervalTurns: 3
           maxAuditsPerSession: 20
+        optimizer:
+          enabled: true
+          cache:
+            enabled: true
+            ttlMs: 3600000
+          tools:
+            maxParallel: 8
+        telemetry:
+          enabled: true
+          prometheusExporter: true
+          anomalyDetection: true
+        qualityAuditor:
+          enabled: true
+          minPassingScore: 85
+        keepAlive:
+          enabled: true
+          intervalMs: 15000
+        stepFeedback:
+          enabled: true
+          includeToolPills: true
+          hotSteeringEnabled: true
+        toneGovernor:
+          enabled: true
+          stripSycophancy: true
+          enforceEmpiricalFact: true
+          enforceDirectMX: true
+        synthesizer:
+          enabled: true
+          maxRawCharsThreshold: 1500
+          fallbackToLocalAST: true
+        graphify:
+          enabled: true
+          graphPath: .graphify/graph.json
+        intentRadar:
+          enabled: true
+          antiTunnelVision: true
+        attentionAnchor:
+          enabled: true
+          lockGoalImmutability: true
+        executiveCognition:
+          enabled: true
+          enforceEmpiricalDeduction: true
+        voiceGateway:
+          enabled: true
+          provider: auto_failover
+          dialect: es-MX

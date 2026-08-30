@@ -100,7 +100,7 @@ export function registerToneGovernor(ctx: Context, config: ToneGovernorConfig = 
   }
 
   // Output response filter hook
-  ctx.on('agent/response' as keyof Context.Events, (response: unknown) => {
+  ctx.on('agent/response' as any, (response: unknown) => {
     if (response && typeof response === 'object' && 'text' in response) {
       const resp = response as { text: string }
       if (typeof resp.text === 'string') {

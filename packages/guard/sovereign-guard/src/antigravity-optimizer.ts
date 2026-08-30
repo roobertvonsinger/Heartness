@@ -149,7 +149,10 @@ export async function executeToolsInParallel<T, R>(
   async function poolWorker(): Promise<void> {
     while (currentIndex < items.length) {
       const idx = currentIndex++
-      results[idx] = await executeWithRetry(items[idx], idx)
+      const item = items[idx]
+      if (item !== undefined) {
+        results[idx] = await executeWithRetry(item, idx)
+      }
     }
   }
 

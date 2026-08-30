@@ -61,10 +61,10 @@ export interface FileVersionInfo {
   filePath: string
   timestamp: number
   checksum: string
-  parentChecksum?: string
+  parentChecksum?: string | undefined
   stagedPath: string
-  diffSummary?: string
-  author?: string
+  diffSummary?: string | undefined
+  author?: string | undefined
 }
 
 export interface RozEngineConfig {
@@ -82,6 +82,12 @@ export interface ThermalModulatorConfig {
   maxTemperature?: number
   feedbackDriven?: boolean
   debugModeTemp?: number
+}
+
+export interface ReflexiveAuditorConfig {
+  enabled?: boolean
+  intervalTurns?: number
+  maxAuditsPerSession?: number
 }
 
 export interface QualityMetrics {
@@ -195,6 +201,13 @@ export interface ProactiveIntentRadarConfig {
   domainGuidelines?: string[]
 }
 
+export interface AttentionAnchorConfig {
+  enabled?: boolean
+  maxLedgerHistory?: number
+  lockGoalImmutability?: boolean
+  injectLedgerHeader?: boolean
+}
+
 export interface ExecutiveCognitionConfig {
   enabled?: boolean
   enforceEmpiricalDeduction?: boolean
@@ -208,19 +221,97 @@ export interface ExecutiveCognitionConfig {
 }
 
 export interface CartesiaVoiceProfile {
-  modelId?: string
-  voiceId?: string
-  speed?: number
-  wsUrl?: string
-  language?: string
+  modelId?: string | undefined
+  voiceId?: string | undefined
+  speed?: number | undefined
+  emotion?: string | undefined
+  emotionIntensity?: 'lowest' | 'low' | 'high' | 'highest' | undefined
+  wsUrl?: string | undefined
+  language?: string | undefined
+  outputFormat?: {
+    container?: 'raw' | 'mp3' | 'wav' | undefined
+    encoding?: 'pcm_s16le' | 'pcm_f32le' | 'pcm_mulaw' | undefined
+    sampleRate?: number | undefined
+  } | undefined
 }
 
 export interface ElevenLabsVoiceProfile {
-  modelId?: string
-  voiceId?: string
-  stability?: number
-  similarityBoost?: number
-  speechEngineId?: string
+  modelId?: string | undefined
+  voiceId?: string | undefined
+  stability?: number | undefined
+  similarityBoost?: number | undefined
+  style?: number | undefined
+  useSpeakerBoost?: boolean | undefined
+  speed?: number | undefined
+  speechEngineId?: string | undefined
+  latencyOptimization?: number | undefined
+}
+
+export interface VoiceModifiers {
+  provider?: 'cartesia' | 'elevenlabs' | 'auto_failover' | undefined
+  modelId?: string | undefined
+  voiceId?: string | undefined
+  emotion?: string | undefined
+  intensity?: 'lowest' | 'low' | 'high' | 'highest' | undefined
+  speed?: number | undefined
+  stability?: number | undefined
+  style?: number | undefined
+  similarityBoost?: number | undefined
+  useSpeakerBoost?: boolean | undefined
+  pauseBeforeMs?: number | undefined
+  pauseAfterMs?: number | undefined
+}
+
+export interface CartesiaStreamRequest {
+  model_id: string
+  transcript: string
+  voice: {
+    mode: 'id' | 'embedding'
+    id: string
+    experimental_controls?: {
+      speed?: number | undefined
+      emotion?: [string, 'lowest' | 'low' | 'high' | 'highest'] | undefined
+    } | undefined
+  }
+  output_format: {
+    container: 'raw' | 'mp3' | 'wav'
+    encoding: 'pcm_s16le' | 'pcm_f32le' | 'pcm_mulaw'
+    sample_rate: number
+  }
+  language: string
+  context_id?: string | undefined
+  continue: boolean
+}
+
+export interface ElevenLabsStreamRequest {
+  text: string
+  model_id: string
+  voice_settings: {
+    stability: number
+    similarity_boost: number
+    style: number
+    use_speaker_boost: boolean
+    speed?: number | undefined
+  }
+}
+
+export interface VoiceGuardConfig {
+  enabled?: boolean | undefined
+  maxCharsPerTurn?: number | undefined
+  maxSessionChars?: number | undefined
+  enableAudioCache?: boolean | undefined
+  skipTrivialSpeech?: boolean | undefined
+  enforceAdvisoryConciseness?: boolean | undefined
+}
+
+export interface VoiceEconomyReport {
+  allowed: boolean
+  processedText: string
+  originalLength: number
+  processedLength: number
+  savedChars: number
+  isCached: boolean
+  skipReason?: string | undefined
 }
 
 export interface DualTrackVoiceConfig {
@@ -228,6 +319,7 @@ export interface DualTrackVoiceConfig {
   provider?: 'cartesia' | 'elevenlabs' | 'auto_failover'
   cartesia?: CartesiaVoiceProfile
   elevenlabs?: ElevenLabsVoiceProfile
+  voiceGuard?: VoiceGuardConfig
   stripMarkdownFromSpeech?: boolean
   maxSpeechChars?: number
   voiceTagDelimiters?: string[]
@@ -246,6 +338,7 @@ export interface SovereignGuardConfig {
   qualityAuditor?: QualityAuditorConfig
   keepAlive?: KeepAliveGatewayConfig
   stepFeedback?: StepFeedbackConfig
+  voiceGuard?: VoiceGuardConfig
   toneGovernor?: ToneGovernorConfig
   synthesizer?: ContextSynthesizerConfig
   graphify?: GraphifyCartographerConfig
@@ -448,30 +541,55 @@ export const ExecutiveCognitionConfig: z<ExecutiveCognitionConfig> = z.object({
     rita: z.string().default('vibe --agent rita'),
     karen: z.string().default('http://2.25.98.162:8642/v1'),
     sidecars: z.array(z.string()).default(['rita-explore', 'rita-review', 'rita-deploy']),
-  }).default({}),
+  }).default({
+    rita: 'vibe --agent rita',
+    karen: 'http://2.25.98.162:8642/v1',
+    sidecars: ['rita-explore', 'rita-review', 'rita-deploy'],
+  }),
 })
 
 export const CartesiaVoiceProfile: z<CartesiaVoiceProfile> = z.object({
   modelId: z.string().default('sonic-3.6'),
   voiceId: z.string().default('1cc00672-e9d4-455e-b3fb-31dfb7aad231'),
   speed: z.number().default(1.0),
+  emotion: z.string(),
+  emotionIntensity: z.string(),
   wsUrl: z.string().default('wss://api.cartesia.ai/tts/websocket'),
   language: z.string().default('es'),
-})
+  outputFormat: z.object({
+    container: z.string(),
+    encoding: z.string(),
+    sampleRate: z.number(),
+  }),
+}) as any
 
 export const ElevenLabsVoiceProfile: z<ElevenLabsVoiceProfile> = z.object({
   modelId: z.string().default('eleven_turbo_v2_5'),
   voiceId: z.string().default('4xkUqaR9MYOJHoaC1Nak'),
   stability: z.number().default(0.5),
   similarityBoost: z.number().default(0.75),
+  style: z.number().default(0.5),
+  useSpeakerBoost: z.boolean().default(true),
+  speed: z.number().default(1.0),
   speechEngineId: z.string().default('seng_sovereign_dsh'),
-})
+  latencyOptimization: z.number(),
+}) as any
+
+export const VoiceGuardConfig: z<VoiceGuardConfig> = z.object({
+  enabled: z.boolean().default(true),
+  maxCharsPerTurn: z.number().default(350),
+  maxSessionChars: z.number().default(50000),
+  enableAudioCache: z.boolean().default(true),
+  skipTrivialSpeech: z.boolean().default(true),
+  enforceAdvisoryConciseness: z.boolean().default(true),
+}) as any
 
 export const DualTrackVoiceConfig: z<DualTrackVoiceConfig> = z.object({
   enabled: z.boolean().default(true),
   provider: z.string().default('auto_failover') as any,
   cartesia: CartesiaVoiceProfile.default({}),
   elevenlabs: ElevenLabsVoiceProfile.default({}),
+  voiceGuard: VoiceGuardConfig.default({}),
   stripMarkdownFromSpeech: z.boolean().default(true),
   maxSpeechChars: z.number().default(400),
   voiceTagDelimiters: z.array(z.string()).default(['<voice>', '</voice>']),
@@ -497,5 +615,6 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   attentionAnchor: AttentionAnchorConfig.default({}),
   executiveCognition: ExecutiveCognitionConfig.default({}),
   voiceGateway: DualTrackVoiceConfig.default({}),
+  voiceGuard: VoiceGuardConfig.default({}),
 })
 

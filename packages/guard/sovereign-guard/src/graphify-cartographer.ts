@@ -92,7 +92,7 @@ export function getGodNodes(graph: KnowledgeGraph, topN = 5): GodNodeInfo[] {
 /**
  * Realiza una consulta temática sobre el grafo devolviendo un subgrafo compacto (≤100 tokens).
  */
-export function queryGraph(query: string, graph: KnowledgeGraph, maxDepth = 2): SubGraphResult {
+export function queryGraph(query: string, graph: KnowledgeGraph, _maxDepth = 2): SubGraphResult {
   const qLower = query.toLowerCase()
   const matchedNodes = graph.nodes.filter(
     n => n.name.toLowerCase().includes(qLower) || (n.path && n.path.toLowerCase().includes(qLower)) || n.id.toLowerCase().includes(qLower),
@@ -143,6 +143,7 @@ export function findDependencyPath(fromNode: string, toNode: string, graph: Know
   while (queue.length > 0) {
     const path = queue.shift()!
     const current = path[path.length - 1]
+    if (!current) continue
 
     if (current.toLowerCase() === toNode.toLowerCase() || current.includes(toNode)) {
       return path

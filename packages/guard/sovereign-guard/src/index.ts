@@ -1,5 +1,5 @@
 /**
- * Sovereign Guard & Middleware Suite for DeepSeek Harness (DSH).
+ * Sovereign Guard & Middleware Suite for DeepSick Hardness (DSH).
  * Provides Context Isolation, Tool Spill Guard, Decision Interception, and Roz Recycle Buffer.
  * @module @deepseek-ai/dsh-sovereign-guard
  */
@@ -25,6 +25,7 @@ import { registerIntentRadar } from './intent-radar.ts'
 import { registerAttentionAnchor } from './attention-anchor.ts'
 import { registerExecutiveCognition } from './executive-director.ts'
 import { registerVoiceGateway } from './voice-gateway.ts'
+import { registerVoiceGuard } from './voice-guard.ts'
 
 export const name = 'sovereign-guard'
 export const Config = SovereignGuardConfig
@@ -60,6 +61,11 @@ export type {
   CartesiaVoiceProfile,
   ElevenLabsVoiceProfile,
   DualTrackVoiceConfig,
+  VoiceModifiers,
+  CartesiaStreamRequest,
+  ElevenLabsStreamRequest,
+  VoiceGuardConfig,
+  VoiceEconomyReport,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'
@@ -80,7 +86,24 @@ export { loadKnowledgeGraph, queryGraph, findDependencyPath, getGodNodes, regist
 export { detectIntent, generateSovereignRadarBriefing, registerIntentRadar } from './intent-radar.ts'
 export { AttentionLedger, globalAttentionLedger, registerAttentionAnchor } from './attention-anchor.ts'
 export { EXECUTIVE_COGNITION_DIRECTIVES, injectExecutiveDirectives, synthesizeExecutivePlan, registerExecutiveCognition } from './executive-director.ts'
-export { cleanMarkdownForSpeech, extractDualTrackPayload, registerVoiceGateway } from './voice-gateway.ts'
+export {
+  cleanMarkdownForSpeech,
+  splitIntoSpeechSentences,
+  generateToolSpeechAnnouncement,
+  parseVoiceTagAttributes,
+  normalizeCartesiaEmotion,
+  buildCartesiaWebSocketPayload,
+  buildElevenLabsPayload,
+  extractDualTrackPayload,
+  registerVoiceGateway,
+} from './voice-gateway.ts'
+export type { DualTrackResult } from './voice-gateway.ts'
+export {
+  VoiceAudioCache,
+  globalAudioCache,
+  VoiceQuotaGuard,
+  registerVoiceGuard,
+} from './voice-guard.ts'
 
 export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerContextIsolator(ctx, config.contextIsolator ?? {})
@@ -101,5 +124,6 @@ export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerAttentionAnchor(ctx, config.attentionAnchor ?? {})
   registerExecutiveCognition(ctx, config.executiveCognition ?? {})
   registerVoiceGateway(ctx, config.voiceGateway ?? {})
+  registerVoiceGuard(ctx, config.voiceGuard ?? {})
 }
 

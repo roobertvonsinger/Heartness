@@ -215,16 +215,17 @@ export function registerHarnessTelemetry(
   // Track tool execution times
   const activeToolTimers = new Map<any, number>()
 
-  ctx.on('tools/pre-execute', (exec) => {
+  ctx.on('tools/pre-execute' as any, async (exec: any, next: any) => {
     activeToolTimers.set(exec, Date.now())
+    return typeof next === 'function' ? next() : { kind: 'allow' }
   })
 
-  ctx.on('tools/post-execute', async (exec, result, next) => {
+  ctx.on('tools/post-execute' as any, async (exec: any, result: any, next: any) => {
     const startTime = activeToolTimers.get(exec)
     if (startTime) {
       activeToolTimers.delete(exec)
       const durationMs = Date.now() - startTime
-      const isError = (result as any)?.kind === 'block' || (result as any)?.isError
+      const isError = result?.kind === 'block' || result?.isError
       collector.recordToolExecution({
         toolName: exec?.name ?? 'unknown',
         durationMs,

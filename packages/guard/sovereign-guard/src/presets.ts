@@ -80,7 +80,7 @@ export const SOVEREIGN_PRESETS: Record<string, SovereignPresetDefinition> = {
  */
 export function resolveSovereignPreset(presetId?: string): SovereignPresetDefinition {
   if (presetId && SOVEREIGN_PRESETS[presetId]) {
-    return SOVEREIGN_PRESETS[presetId]
+    return SOVEREIGN_PRESETS[presetId]!
   }
-  return SOVEREIGN_PRESETS['sovereign-coder']
+  return SOVEREIGN_PRESETS['sovereign-coder']!
 }

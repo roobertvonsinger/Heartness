@@ -26,7 +26,7 @@ export function generateStepPill(
   const timestamp = Date.now()
 
   if (error) {
-    const errorMsg = String(error.message || error).slice(0, 60)
+    const errorMsg = String(error instanceof Error ? error.message : error).slice(0, 60)
     return {
       toolName,
       pill: `⚠️ Falló la acción en ${toolName} (${errorMsg}), evaluando alternativa...`,
@@ -39,7 +39,7 @@ export function generateStepPill(
 
   // 1. File Inspection / View
   if (name.includes('view') || name.includes('read')) {
-    const target = args.AbsolutePath || args.TargetFile || args.path || args.file || ''
+    const target = String(args.AbsolutePath || args.TargetFile || args.path || args.file || '')
     const basename = target.split(/[\\/]/).filter(Boolean).pop() || 'archivo'
     return {
       toolName,
@@ -51,7 +51,7 @@ export function generateStepPill(
 
   // 2. File Editing / Writing
   if (name.includes('write') || name.includes('replace') || name.includes('edit')) {
-    const target = args.TargetFile || args.AbsolutePath || args.path || args.file || ''
+    const target = String(args.TargetFile || args.AbsolutePath || args.path || args.file || '')
     const basename = target.split(/[\\/]/).filter(Boolean).pop() || 'archivo'
     return {
       toolName,
@@ -63,7 +63,7 @@ export function generateStepPill(
 
   // 3. Search / Grep / Discovery
   if (name.includes('grep') || name.includes('search')) {
-    const q = args.Query || args.query || args.pattern || ''
+    const q = String(args.Query || args.query || args.pattern || '')
     const queryExcerpt = q.length > 25 ? `${q.slice(0, 22)}...` : q
     return {
       toolName,
@@ -74,7 +74,7 @@ export function generateStepPill(
   }
 
   if (name.includes('list') || name.includes('ls')) {
-    const target = args.DirectoryPath || args.path || ''
+    const target = String(args.DirectoryPath || args.path || '')
     const basename = target.split(/[\\/]/).filter(Boolean).pop() || 'directorio'
     return {
       toolName,
@@ -132,7 +132,7 @@ export function generateStepPill(
     }
   }
 
-  // Default fallback
+  // 5. Default Fallback Pill
   return {
     toolName,
     pill: `⚙️ Procesando paso con ${toolName}...`,
@@ -142,10 +142,10 @@ export function generateStepPill(
 }
 
 /**
- * Non-blocking memory queue for user mid-turn steering interventions.
+ * Mid-Turn Steering Queue for hot-injecting user feedback during autonomous executions.
  */
 export class MidTurnSteeringQueue {
-  private queue: Map<string, string[]> = new Map()
+  private queue = new Map<string, string[]>()
 
   push(sessionId: string, directive: string): void {
     const clean = directive.trim()
@@ -161,9 +161,31 @@ export class MidTurnSteeringQueue {
     return pending
   }
 
+  popNext(sessionId: string): string | undefined {
+    const q = this.queue.get(sessionId)
+    if (!q || q.length === 0) return undefined
+    const item = q.shift()
+    if (q.length === 0) {
+      this.queue.delete(sessionId)
+    }
+    return item
+  }
+
+  peekAll(sessionId: string): string[] {
+    return this.queue.get(sessionId) ?? []
+  }
+
+  clear(sessionId: string): void {
+    this.queue.delete(sessionId)
+  }
+
   hasPending(sessionId: string): boolean {
     const list = this.queue.get(sessionId)
     return Boolean(list && list.length > 0)
+  }
+
+  hasDirectives(sessionId: string): boolean {
+    return this.hasPending(sessionId)
   }
 
   formatContextInjection(sessionId: string): string {
@@ -173,8 +195,16 @@ export class MidTurnSteeringQueue {
     return `\n[⚡ Intervención del Usuario en Caliente — Considerar para este paso inmediato]:\n${formatted}\n`
   }
 
-  clear(sessionId: string): void {
-    this.queue.delete(sessionId)
+  consumeFormattedContext(sessionId: string): string | undefined {
+    const pending = this.popPending(sessionId)
+    if (pending.length === 0) return undefined
+
+    return (
+      `\n\n[🚨 MID-TURN SOVEREIGN USER STEERING INJECTION]\n` +
+      `Robert has injected a live steering directive during this execution turn:\n` +
+      pending.map((d, i) => `${i + 1}. "${d}"`).join('\n') +
+      `\nPrioritize fulfilling this steering directive immediately while maintaining task integrity.`
+    )
   }
 }
 
@@ -187,24 +217,24 @@ export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = 
   if (config.enabled === false) return
 
   // Hook tool execution lifecycle to dispatch orientative pills
-  ctx.on('tool/before-execute' as keyof Context.Events, (event: unknown) => {
+  ctx.on('tool/before-execute' as any, (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown> }
     const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {})
-    ctx.emit('progress/step-pill' as keyof Context.Events, pill as unknown as never)
+    ctx.emit('progress/step-pill' as any, pill)
   })
 
-  ctx.on('tool/after-execute' as keyof Context.Events, (event: unknown) => {
+  ctx.on('tool/after-execute' as any, (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown>; error?: unknown }
     if (ev.error) {
       const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {}, ev.error)
-      ctx.emit('progress/step-pill' as keyof Context.Events, pill as unknown as never)
+      ctx.emit('progress/step-pill' as any, pill)
     }
   })
 
   // Hook user input during active run
-  ctx.on('user/mid-turn-input' as keyof Context.Events, (event: unknown) => {
+  ctx.on('user/mid-turn-input' as any, (event: unknown) => {
     if (event && typeof event === 'object') {
       const ev = event as { sessionId?: string; text?: string }
       if (ev.sessionId && ev.text) {
@@ -213,4 +243,3 @@ export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = 
     }
   })
 }
-

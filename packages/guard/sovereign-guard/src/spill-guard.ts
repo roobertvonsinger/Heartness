@@ -31,6 +31,7 @@ export function extractSemanticExcerpts(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+    if (line === undefined) continue
     const lineNumber = startLineOffset + i + 1
 
     if (preserveErrors && errorRegex.test(line)) {
@@ -79,7 +80,7 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
 
     const downstreamResult = typeof next === 'function'
       ? await next()
-      : { kind: 'accept', content: rawBlocks }
+      : ({ kind: 'accept', content: rawBlocks } as const)
 
     const downstream: PostToolDecision = downstreamResult ?? { kind: 'accept', content: rawBlocks }
 

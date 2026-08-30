@@ -32,22 +32,24 @@ export function evaluateToolSafety(
     const questions = (args.questions as Array<{ options?: string[]; question?: string }>) ?? []
     if (questions.length > 0) {
       const firstQ = questions[0]
-      const recommended = firstQ.options?.find(opt => opt.toLowerCase().includes('(recommended)') || opt.toLowerCase().includes('recommended'))
-      if (recommended) {
-        return {
-          action: 'AUTO_RESOLVE',
-          confidence: 0.95,
-          reason: `Auto-selecting recommended response for '${firstQ.question ?? 'interactive question'}'`,
-          suggestedAnswer: recommended,
+      if (firstQ) {
+        const recommended = firstQ.options?.find(opt => opt.toLowerCase().includes('(recommended)') || opt.toLowerCase().includes('recommended'))
+        if (recommended) {
+          return {
+            action: 'AUTO_RESOLVE',
+            confidence: 0.95,
+            reason: `Auto-selecting recommended response for '${firstQ.question ?? 'interactive question'}'`,
+            suggestedAnswer: recommended,
+          }
         }
-      }
-      const firstOption = firstQ.options?.[0]
-      if (firstOption) {
-        return {
-          action: 'AUTO_RESOLVE',
-          confidence: 0.88,
-          reason: 'Auto-selecting default leading option in autonomous pipeline',
-          suggestedAnswer: firstOption,
+        const firstOption = firstQ.options?.[0]
+        if (firstOption) {
+          return {
+            action: 'AUTO_RESOLVE',
+            confidence: 0.88,
+            reason: 'Auto-selecting default leading option in autonomous pipeline',
+            suggestedAnswer: firstOption,
+          }
         }
       }
     }
@@ -84,13 +86,14 @@ export function registerDecisionInterceptor(ctx: Context, config: DecisionInterc
   const destructiveKeywords = config.destructiveKeywords ?? ['rm -rf', 'DROP TABLE', 'format', 'truncate', 'delete from', 'rmdir /s']
 
   ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
-    const args = ((exec as Record<string, unknown>).args as Record<string, unknown>) ?? {}
+    const execObj = exec as unknown as Record<string, unknown>
+    const args = (execObj.arguments as Record<string, unknown>) ?? (execObj.args as Record<string, unknown>) ?? {}
     const evaluation = evaluateToolSafety(exec.name, args, destructiveKeywords)
 
     if (evaluation.action === 'CONFIRM' && evaluation.confidence >= confidenceThreshold) {
       ctx.logger?.warn?.(`[decision-interceptor] Blocked unconfirmed destructive action for tool '${exec.name}': ${evaluation.reason}`)
       return {
-        kind: 'block',
+        kind: 'deny',
         reason: `[SOVEREIGN GUARD SAFEGUARD] Destructive action requires explicit confirmation: ${evaluation.reason}`,
       }
     }

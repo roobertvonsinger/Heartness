@@ -79,7 +79,7 @@ async function createRepo() {
   return newRepo.html_url
 }
 
-createRepo().catch(err => {
+createRepo().catch((err) => {
   console.error(err)
   process.exit(1)
 })

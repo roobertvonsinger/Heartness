@@ -38,7 +38,9 @@ export function extractASTOutline(rawContent: string, langHint = 'ts'): ASTOutli
   let importsCount = 0
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim()
+    const rawLine = lines[i]
+    if (rawLine === undefined) continue
+    const line = rawLine.trim()
     const lineNum = i + 1
 
     if (line.startsWith('import ') || line.startsWith('from ')) {
