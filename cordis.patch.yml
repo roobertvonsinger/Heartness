@@ -187,3 +187,10 @@
           enabled: true
           provider: auto_failover
           dialect: es-MX
+
+# --- 📁 WORKSPACE DIRECTORY PICKER (IN-APP BROWSER DIALOG) ---
+- id: host-directory-picker-browse
+  name: '@deepseek-ai/dsh-host-directory-picker-browse'
+
+- id: ui-directory-picker-browse
+  name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
