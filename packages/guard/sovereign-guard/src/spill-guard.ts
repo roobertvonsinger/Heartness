@@ -24,6 +24,7 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
       : { kind: 'accept', content: rawBlocks }
 
     if (downstream.kind === 'block') return downstream
+    if (exec?.name === 'read' || exec?.name === 'fs_read') return downstream
 
     // Inspect content blocks
     const targetBlocks: ContentBlock[] = downstream.content ?? rawBlocks
@@ -86,5 +87,5 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
     }
 
     return downstream
-  })
+  }, { prepend: true })
 }

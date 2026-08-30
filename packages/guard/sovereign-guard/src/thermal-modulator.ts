@@ -18,13 +18,15 @@ export function calculateSyntacticWeight(text: string): { score: number; metrics
     return { score: 0, metrics: { logicalCount: 0, clauseCount: 0, maxDepth: 0, wordCount: 0 } }
   }
 
-  // 1. Logical and conditional operators (ternaries, logic operators, decision conjunctions)
-  const logicalMatches = text.match(/\b(if|else|unless|provided|given that|specifically when|while|switch|case|match|and|or|not|xor)\b|&&|\|\||\?|\:|\=\=\=/gi) ?? []
+  // 1. Logical and conditional operators (ternaries, logic operators, decision conjunctions, math logic)
+  const logicalMatches = text.match(/\b(if|else|unless|provided|given that|specifically when|while|switch|case|match|and|or|not|xor|forall|exists|det|rank|dim)\b|&&|\|\||\\land|\\lor|\\le|\\ge|\\neq|\\in|\\subset|\?|\:|\=\=\=|\=\=/gi) ?? []
   const logicalCount = logicalMatches.length
 
-  // 2. Multi-clause constructs (semicolons, structured bullets, nested numbering, transitional phrases)
-  const clauseMatches = text.match(/[;\n][\s]*[-*•\d]+[.)]|\b(therefore|furthermore|specifically|moreover|conversely|in contrast|in parallel)\b/gi) ?? []
-  const clauseCount = clauseMatches.length
+  // 2. Multi-clause constructs (semicolons, structured bullets, numbered steps, transitional phrases)
+  const bulletMatches = text.match(/(?:^|\n)\s*[-*•\d]+[.)]/gm) ?? []
+  const semicolonMatches = text.match(/;/g) ?? []
+  const transitionalMatches = text.match(/\b(therefore|furthermore|specifically|moreover|conversely|in contrast|in parallel|provided that|given that|specifically when)\b/gi) ?? []
+  const clauseCount = bulletMatches.length + semicolonMatches.length + transitionalMatches.length
 
   // 3. Parenthetical / Bracket nesting depth
   let maxDepth = 0
