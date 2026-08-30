@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { RozEngineConfig } from './types.ts'
@@ -38,6 +38,38 @@ export class RozRecycleEngine {
       const targetPath = join(dayDir, targetName)
       copyFileSync(filePath, targetPath)
       return targetPath
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Back up conversational context messages or summary data */
+  public backupContextData(contextId: string, data: any): string | undefined {
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const contextDir = join(this.stagingDir, 'contexts', today)
+      if (!existsSync(contextDir)) {
+        mkdirSync(contextDir, { recursive: true })
+      }
+      const timestamp = Date.now()
+      const cleanId = contextId.replace(/[^a-zA-Z0-9_-]/g, '_')
+      const targetName = `context_${cleanId}_${timestamp}.json`
+      const targetPath = join(contextDir, targetName)
+      writeFileSync(targetPath, JSON.stringify({ contextId, timestamp, data }, null, 2), 'utf-8')
+      return targetPath
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Restore contextual data from backup */
+  public restoreContextData(filePath: string): any | undefined {
+    try {
+      if (existsSync(filePath)) {
+        const content = readFileSync(filePath, 'utf-8')
+        return JSON.parse(content)
+      }
+      return undefined
     } catch {
       return undefined
     }
