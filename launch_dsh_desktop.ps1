@@ -1,5 +1,5 @@
-# Launcher de RITA DSH en Ventana Desktop Autonoma (Sin pestañas ni barra de navegador)
-$RepoDir = 'c:\Users\rober\Dropbox\TESTING DEV\repos\deepseek-harness'
+# Launcher de DSH (DeepSick Hardness) en Ventana Desktop Autonoma
+$RepoDir = 'c:\Users\rober\Dropbox\TESTING DEV\repos\dsh'
 $Port = '3080'
 $Url = "http://127.0.0.1:$Port"
 $ProfileDir = "$env:LOCALAPPDATA\DSH_Desktop_Profile"
@@ -59,13 +59,13 @@ if (Test-Path $edgePath) {
 }
 
 if ($browserExe) {
-    Write-Host "[DSH] Lanzando ventana autónoma de RITA DSH..." -ForegroundColor Green
+    Write-Host "[DSH] Lanzando ventana autónoma de DeepSick Hardness (DSH)..." -ForegroundColor Green
     $appArgs = @(
         "--app=$Url",
         "--window-size=1366,900",
         "--user-data-dir=$ProfileDir",
-        "--app-id=rita-dsh-sovereign",
-        "--title=RITA DSH - Copiloto Soberano"
+        "--app-id=dsh-sovereign",
+        "--title=DeepSick Hardness (DSH)"
     )
     Start-Process -FilePath $browserExe -ArgumentList $appArgs
 } else {

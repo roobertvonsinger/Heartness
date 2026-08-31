@@ -9,7 +9,7 @@ Write-Host ' INICIANDO DEEPSICK HARDNESS (DSH) CON CORDIS & 9ROUTER' -Foreground
 Write-Host '==========================================================================' -ForegroundColor Cyan
 
 $env:NINEROUTER_API_KEY = 'kvm4-hermes-super-2026'
-$RepoDir = 'c:\Users\rober\Dropbox\TESTING DEV\repos\deepseek-harness'
+$RepoDir = 'c:\Users\rober\Dropbox\TESTING DEV\repos\dsh'
 
 if (Test-Path "$RepoDir\.env") {
     Get-Content "$RepoDir\.env" | ForEach-Object {

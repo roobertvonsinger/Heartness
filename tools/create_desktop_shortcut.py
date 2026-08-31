@@ -3,9 +3,19 @@ import subprocess
 
 def create_shortcut():
     desktop_path = os.path.expanduser('~/Desktop')
-    shortcut_path = os.path.join(desktop_path, 'RITA DSH.lnk')
-    vbs_path = r'c:\Users\rober\Dropbox\TESTING DEV\repos\deepseek-harness\RITA_DSH.vbs'
-    work_dir = r'c:\Users\rober\Dropbox\TESTING DEV\repos\deepseek-harness'
+    shortcut_path = os.path.join(desktop_path, 'DSH.lnk')
+    old_shortcut_path = os.path.join(desktop_path, 'RITA DSH.lnk')
+    
+    # Remove old shortcut if exists
+    if os.path.exists(old_shortcut_path):
+        try:
+            os.remove(old_shortcut_path)
+            print(f"[-] Acceso directo antiguo eliminado: {old_shortcut_path}")
+        except Exception:
+            pass
+
+    vbs_path = r'c:\Users\rober\Dropbox\TESTING DEV\repos\dsh\DSH.vbs'
+    work_dir = r'c:\Users\rober\Dropbox\TESTING DEV\repos\dsh'
 
     ps_command = f"""
     $WshShell = New-Object -ComObject WScript.Shell
@@ -13,7 +23,7 @@ def create_shortcut():
     $Shortcut.TargetPath = 'wscript.exe'
     $Shortcut.Arguments = '"{vbs_path}"'
     $Shortcut.WorkingDirectory = '{work_dir}'
-    $Shortcut.Description = 'RITA DSH - Copiloto Soberano y Harness Agéntico'
+    $Shortcut.Description = 'DeepSick Hardness (DSH)'
     $Shortcut.Save()
     """
 
