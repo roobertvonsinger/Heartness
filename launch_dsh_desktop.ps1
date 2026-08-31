@@ -1,8 +1,10 @@
-# Launcher de DSH (DeepSick Hardness) en Ventana Desktop Autonoma
-$RepoDir = 'c:\Users\rober\Dropbox\TESTING DEV\repos\dsh'
+# Launcher de DSH (DeepSick Hardness) en Ventana Desktop Autonoma con Instancia Unica
+$RepoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $RepoDir) { $RepoDir = 'c:\Users\rober\Dropbox\TESTING DEV\repos\dsh' }
 $Port = '3080'
 $Url = "http://127.0.0.1:$Port"
 $ProfileDir = "$env:LOCALAPPDATA\DSH_Desktop_Profile"
+$WindowTitle = "DeepSick Hardness (DSH)"
 
 Set-Location $RepoDir
 
@@ -15,7 +17,15 @@ if (Test-Path "$RepoDir\.env") {
     }
 }
 
-# 2. Verificar si el servidor DSH ya está corriendo
+# 2. Verificar si la ventana de DSH ya está abierta y enfocarla (Single Instance / Focus)
+$wsh = New-Object -ComObject WScript.Shell
+$activated = $wsh.AppActivate($WindowTitle)
+if ($activated) {
+    Write-Host "[DSH] Ventana activa detectada. Enfocando ventana existente..." -ForegroundColor Green
+    exit 0
+}
+
+# 3. Verificar si el servidor DSH ya está respondiendo
 $serverReady = $false
 try {
     $res = Invoke-WebRequest -Uri $Url -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
@@ -24,7 +34,7 @@ try {
     }
 } catch {}
 
-# 3. Si no está corriendo, levantarlo en segundo plano
+# 4. Si no está corriendo, levantarlo en segundo plano
 if (-not $serverReady) {
     Write-Host "[DSH] Iniciando servidor backend en puerto $Port..." -ForegroundColor Cyan
     $nodeProcess = Start-Process -FilePath "node" -ArgumentList "apps/cli/lib/bin.js", "web", "--port", $Port, "--no-open" -WorkingDirectory $RepoDir -WindowStyle Hidden -PassThru
@@ -44,7 +54,7 @@ if (-not $serverReady) {
     }
 }
 
-# 4. Localizar navegador para modo App (Edge nativo de Windows o Chrome)
+# 5. Localizar navegador para modo App (Edge nativo de Windows o Chrome)
 $edgePath = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 if (-not (Test-Path $edgePath)) {
     $edgePath = "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
@@ -65,7 +75,7 @@ if ($browserExe) {
         "--window-size=1366,900",
         "--user-data-dir=$ProfileDir",
         "--app-id=dsh-sovereign",
-        "--title=DeepSick Hardness (DSH)"
+        "--title=$WindowTitle"
     )
     Start-Process -FilePath $browserExe -ArgumentList $appArgs
 } else {
