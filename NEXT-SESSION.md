@@ -1,4 +1,4 @@
-# NEXT-SESSION.md — deepseek-harness × Continuidad Soberana
+# NEXT-SESSION.md — DSH (DeepSick Hardness) × Continuidad Soberana
 
 **Fecha:** 2026-08-30
 **Agente Activo:** rita
