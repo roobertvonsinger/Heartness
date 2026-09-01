@@ -188,7 +188,7 @@ export class TransactionalBrainAdapter {
       const stmt = this.db.prepare(`
         SELECT payload, checksum FROM session_deltas
         WHERE repository = ?
-        ORDER BY updated_at DESC
+        ORDER BY updated_at DESC, rowid DESC
         LIMIT 1;
       `)
       const row = stmt.get(repository) as { payload: string; checksum: string } | undefined

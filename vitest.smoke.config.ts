@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config'
 import { standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
 
 /**
- * Ultralight Smoke Test Configuration for DSH & Sovereign Continuity (<2s execution)
+ * Ultralight Smoke & Chaos Test Configuration for DSH & Sovereign Continuity (<2s execution)
  */
 export default defineConfig({
   plugins: [
@@ -16,6 +16,7 @@ export default defineConfig({
       'packages/guard/sovereign-guard/tests/sovereign-guard.spec.ts',
       'packages/guard/sovereign-guard/tests/session-verifiable-artifact.spec.ts',
       'packages/guard/sovereign-guard/tests/sovereign-presets.spec.ts',
+      'packages/guard/sovereign-guard/tests/chaos-resilience.spec.ts',
     ],
     testTimeout: 10_000,
     hookTimeout: 5_000,
