@@ -131,4 +131,16 @@ describe('Chaos & Fault Injection Resilience Suite', () => {
       primer.close()
     })
   })
+
+  describe('Intent Radar & Sensitive Bypass Auto-Detection', () => {
+    it('automatically classifies CDP, WebRTC, and BetMexico prompts into sensitive_bypass with Karen escalation', async () => {
+      const { detectIntent } = await import('../src/intent-radar.ts')
+      const result = detectIntent('Necesito que KCKY inyecte el stream WebRTC y evada la detección CDP de Cloudflare')
+
+      expect(result.category).toBe('sensitive_bypass')
+      expect(result.confidence).toBeGreaterThanOrEqual(0.95)
+      expect(result.canonicalPattern).toContain('Karen (:8642)')
+      expect(result.proactiveSuggestions.some(s => s.includes('Karen'))).toBe(true)
+    })
+  })
 })

@@ -30,8 +30,10 @@ import { registerReflexiveLearner } from './reflexive-learner.ts'
 import { registerHTCCalibrator } from './htc-calibrator.ts'
 import { registerBrainGraph } from './brain-graph.ts'
 import { registerOpenDesign } from './open-design.ts'
+import { registerAdaptivePivoter } from './adaptive-pivoter.ts'
 
 export const name = 'sovereign-guard'
+export const inject = ['systemPrompt']
 
 export const Config = SovereignGuardConfig
 
@@ -89,6 +91,7 @@ export type {
   NodeCanvasEdge,
   NodeCanvasGraph,
   OpenDesignConfig,
+  AdaptivePivoterConfig,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'
@@ -169,6 +172,14 @@ export {
   registerOpenDesign,
 } from './open-design.ts'
 export {
+  AdaptivePivoterEngine,
+  registerAdaptivePivoter,
+} from './adaptive-pivoter.ts'
+export type {
+  PivotDecision,
+  FailureRecord,
+} from './adaptive-pivoter.ts'
+export {
   TransactionalBrainAdapter,
   calculateChecksum,
   SessionDeltaEngine,
@@ -206,4 +217,5 @@ export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerHTCCalibrator(ctx, config.htcCalibrator ?? {})
   registerBrainGraph(ctx, config.brainGraph ?? {})
   registerOpenDesign(ctx, config.openDesign ?? {})
+  registerAdaptivePivoter(ctx, config.adaptivePivoter?.maxRetries ?? 2)
 }

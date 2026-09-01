@@ -220,6 +220,12 @@ export interface ExecutiveCognitionConfig {
   }
 }
 
+export interface AdaptivePivoterConfig {
+  enabled?: boolean
+  maxRetries?: number
+  ttlMs?: number
+}
+
 export interface BrainBridgeConfig {
   dbPath?: string
   walMode?: boolean
@@ -494,6 +500,7 @@ export interface SovereignGuardConfig {
   attentionAnchor?: AttentionAnchorConfig
   executiveCognition?: ExecutiveCognitionConfig
   voiceGateway?: DualTrackVoiceConfig
+  adaptivePivoter?: AdaptivePivoterConfig
 }
 
 export const ModelRule: z<ModelRule> = z.object({
@@ -680,6 +687,12 @@ export const AttentionAnchorConfig: z<AttentionAnchorConfig> = z.object({
   injectLedgerHeader: z.boolean().default(true),
 })
 
+export const AdaptivePivoterConfig: z<AdaptivePivoterConfig> = z.object({
+  enabled: z.boolean().default(true),
+  maxRetries: z.number().default(2),
+  ttlMs: z.number().default(120_000),
+})
+
 export const ExecutiveCognitionConfig: z<ExecutiveCognitionConfig> = z.object({
   enabled: z.boolean().default(true),
   enforceEmpiricalDeduction: z.boolean().default(true),
@@ -821,4 +834,5 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   htcCalibrator: HTCCalibratorConfig.default({}),
   brainGraph: BrainGraphConfig.default({}),
   openDesign: OpenDesignConfig.default({}),
+  adaptivePivoter: AdaptivePivoterConfig.default({}),
 })

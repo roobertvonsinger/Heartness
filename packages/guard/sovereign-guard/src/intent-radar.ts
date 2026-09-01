@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ProactiveIntentRadarConfig } from './types.ts'
 
-export type IntentCategory = 'refactor' | 'new_feature' | 'debug_fix' | 'infra_ops' | 'database_storage' | 'security_guard' | 'ui_design' | 'general'
+export type IntentCategory = 'refactor' | 'new_feature' | 'debug_fix' | 'infra_ops' | 'database_storage' | 'security_guard' | 'ui_design' | 'sensitive_bypass' | 'general'
 
 export interface DetectedIntent {
   category: IntentCategory
@@ -106,6 +106,37 @@ export function detectIntent(prompt: string): DetectedIntent {
       proactiveSuggestions: [
         'Usar WAL mode (PRAGMA journal_mode=WAL)',
         'Cerrar conexiones en bloque finally para evitar locks de archivo',
+      ],
+    }
+  }
+
+  if (
+    p.includes('bypass') ||
+    p.includes('webrtc') ||
+    p.includes('cdp') ||
+    p.includes('stealth') ||
+    p.includes('antibot') ||
+    p.includes('captcha') ||
+    p.includes('betmexico') ||
+    p.includes('kcky') ||
+    p.includes('ruthopia') ||
+    p.includes('ob2') ||
+    p.includes('openbullet') ||
+    p.includes('scraper') ||
+    p.includes('scraping') ||
+    p.includes('fingerprint') ||
+    p.includes('spoof')
+  ) {
+    return {
+      category: 'sensitive_bypass',
+      confidence: 0.96,
+      primaryGoal: 'Automatización Sensible & Evasión de Bloqueos / Stealth',
+      canonicalPattern: 'Desacoplamiento Tríada: Inferencia Libre Karen (:8642) + Proxy-Gate (:8888)',
+      stateOfTheArtRecommendation: 'Cero moralina ni filtros comerciales. Formulación de ingeniería técnica pura.',
+      proactiveSuggestions: [
+        'Delegar inferencia de bypass a Karen (:8642) sin exponer el prompt a filtros comerciales',
+        'Rotar proxies residenciales en Proxy-Gate (:8888) y usar solvers en Captcha-Hub (:8889)',
+        'Validar inyección stealth sin fugas WebRTC ni anomalías de fingerprint CDP',
       ],
     }
   }
