@@ -4,8 +4,11 @@
  * - warm-start: Outputs ultra-compact prompt (<250 tokens) for instant session resume.
  * - brief: Human-readable 1-second summary of last session delta and active goals.
  * - save-delta: Saves structured delta to data/brain.db and NEXT-SESSION.md.
+ * - generate-next: Delegates to scripts/generate-next-session.ts for full factual derivation.
  */
 
+import { execSync } from 'node:child_process'
+import path from 'node:path'
 import {
   SessionDeltaEngine,
   WarmStartPrimer,
@@ -40,6 +43,12 @@ async function run() {
         console.log(`• Repositorio:     ${latest.repository}`)
         console.log(`• Objetivo Base:   ${latest.primaryGoal}`)
         console.log(`• Última Acción:   ${latest.nextAction}`)
+        if (latest.gitTelemetry) {
+          console.log(`• Git:             ${latest.gitTelemetry.branch} (${latest.gitTelemetry.commitHash}) | ${latest.gitTelemetry.dirtyCount} mods`)
+        }
+        if (latest.testTelemetry) {
+          console.log(`• Tests:           ${latest.testTelemetry.passed}/${latest.testTelemetry.total} PASS (${(latest.testTelemetry.durationMs / 1000).toFixed(2)}s)`)
+        }
         console.log(`• Decisiones (${latest.decisions.length}):`)
         latest.decisions.forEach(d => console.log(`  - [${d.impact}] ${d.topic}: ${d.decision}`))
         console.log(`• Bloqueos Resueltos (${latest.resolvedBlockers.length}):`)
@@ -52,6 +61,8 @@ async function run() {
       case 'save-delta': {
         const goal = process.argv[3] || 'Desarrollo y Continuidad DSH'
         const nextAction = process.argv[4] || 'Continuar ejecución de tareas'
+        const gitTelemetry = engine.extractGitTelemetry()
+        const testTelemetry = engine.extractTestTelemetry({ configPath: 'vitest.smoke.config.ts' })
 
         const delta = engine.createDelta({
           primaryGoal: goal,
@@ -65,17 +76,27 @@ async function run() {
           ],
           activeFiles: [
             'packages/guard/sovereign-guard/src/session-continuity.ts',
+            'scripts/generate-next-session.ts',
+            'vitest.smoke.config.ts',
             'tools/session_bridge.ts',
           ],
+          gitTelemetry,
+          testTelemetry,
         })
 
         engine.exportToNextSessionMarkdown(delta)
-        console.log(`✅ Delta guardado exitosamente en brain.db y NEXT-SESSION.md (ID: ${delta.sessionId})`)
+        console.log(`✅ Delta factual guardado exitosamente en brain.db y NEXT-SESSION.md (ID: ${delta.sessionId})`)
+        break
+      }
+
+      case 'generate-next': {
+        const scriptPath = path.resolve(process.cwd(), 'scripts', 'generate-next-session.ts')
+        execSync(`npx tsx ${scriptPath}`, { stdio: 'inherit' })
         break
       }
 
       default: {
-        console.log(`Uso: npx tsx tools/session_bridge.ts [warm-start | brief | save-delta]`)
+        console.log(`Uso: npx tsx tools/session_bridge.ts [warm-start | brief | save-delta | generate-next]`)
       }
     }
   } finally {

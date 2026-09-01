@@ -1,30 +1,38 @@
-# NEXT-SESSION.md — DSH (DeepShell / Sovereign Harness) × Continuidad Soberana
+# NEXT-SESSION — DSH × Continuidad Soberana
 
-**Fecha:** 2026-08-31
-**Agente Activo:** antigravity
-**Objetivo Base:** Ciclo Dialéctico Smartplan & Launcher Resiliente con Instancia Única
-**Estado:** 🟢 100% Verificado (Pruebas COM y Ejecución en Verde)
+<!-- FACTUAL ARTIFACT DERIVED FROM REPO TELEMETRY (SHA-256: 5fd5f3aac327f613a90ecf0027d91fde59837f9eec0c7f246e4fdfe4d9a0d8da) -->
+
+## 📊 Telemetría de Estado Verificable
+- **Fecha:** 2026-09-01 (05:39:19 UTC)
+- **Agente Activo:** `antigravity`
+- **Git Telemetría:** Rama `master` | Commit `a143e54569` (*feat(launcher): add single-instance detection, hotkey Ctrl+Alt+D and dialectic Smartplan workflow*)
+- **Árbol de Trabajo:** 🟡 35 archivos modificados
+- **Suites de Test:** 🟢 3/3 PASS (Smoke tests en 3.39s)
+- **SHA-256 Verificación:** `5fd5f3aac327f613a90ecf0027d91fde59837f9eec0c7f246e4fdfe4d9a0d8da`
 
 ---
 
 ## 🎯 Últimas Decisiones & Arquitectura
-- **[HIGH] Flujo Dialéctico de 5 Fases:** Integrado en `.agents/workflows/Smartplan.md` (Propuesta Base -> Re-análisis Interno -> Co-Auditoría DSH/Tríada -> Fusión Sintética de Viabilidad -> Emisión de Plan).
-- **[HIGH] Launcher Desktop con Instancia Única:** `launch_dsh_desktop.ps1` detecta ventanas activas (`AppActivate`) para traer DSH al frente sin duplicar procesos en el puerto 3080.
-- **[HIGH] Acceso Directo Dinámico & Hotkey:** `tools/create_desktop_shortcut.py` asigna atajo global `Ctrl+Alt+D`, rutas dinámicas con `pathlib.Path` e icono de sistema.
+- **[HIGH] Artefacto Factual de Continuidad:** Generación programática de NEXT-SESSION.md derivada de Git y Vitest
+- **[MEDIUM] Sincronización Pública:** Repo público configurado en https://github.com/roobertvonsinger/Heartness.git
 
 ## 🛡️ Dolores de Cabeza & Bloqueos Eliminados
-- ✅ Eliminada duplicación de instancias de backend y ventanas al invocar el launcher repetidas veces.
-- ✅ Eliminado hardcoding frágil de rutas absolutas en el generador del acceso directo.
-- ✅ Corregido encoding CP1252 en salidas de consola Windows (`tools/create_desktop_shortcut.py`).
-- ✅ Incorporada co-auditoría obligatoria con Karen (Hermes KVM4 :8642) y DSH antes de ejecutar planes.
+- ✅ Eliminada desincronización manual de handoffs inter-sesión
+- ✅ Protegido SQLite WAL con BEGIN IMMEDIATE y busy timeout 5000ms
 
 ## ⚡ Archivos Clave en Foco
-- `tools/create_desktop_shortcut.py`
-- `launch_dsh_desktop.ps1`
-- `.agents/workflows/Smartplan.md`
-- `tools/consult_hermes_audit.ts`
+`packages/guard/sovereign-guard/src/session-continuity.ts`, `scripts/generate-next-session.ts`, `vitest.smoke.config.ts`, `tools/session_bridge.ts`
 
 ---
 
 ## 🚀 Siguiente Acción Inmediata (Directiva del Punto)
-> **Lanzar y validar sesión interactiva de DSH desde el escritorio con `Ctrl+Alt+D` o `DSH.lnk` y continuar con el canvas visual de workflows.**
+> **Continuar ejecución de tareas del roadmap activo**
+
+## ⚡ Comandos Rápidos de Verificación:
+```powershell
+# 1. Ejecutar tests smoke
+pnpm run test:smoke
+
+# 2. Re-generar artefacto de continuidad verificado
+pnpm run dsh:next
+```

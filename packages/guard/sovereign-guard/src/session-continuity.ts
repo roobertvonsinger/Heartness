@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -10,6 +11,23 @@ export interface SessionDecision {
   impact: 'LOW' | 'MEDIUM' | 'HIGH'
 }
 
+export interface SessionGitTelemetry {
+  branch: string
+  commitHash: string
+  commitMessage: string
+  dirtyCount: number
+  modifiedFiles: string[]
+}
+
+export interface SessionTestTelemetry {
+  passed: number
+  failed: number
+  total: number
+  durationMs: number
+  suitesPassed: boolean
+  failureSummary?: string
+}
+
 export interface SessionDelta {
   sessionId: string
   timestamp: string
@@ -20,6 +38,8 @@ export interface SessionDelta {
   resolvedBlockers: string[]
   nextAction: string
   activeFiles: string[]
+  gitTelemetry?: SessionGitTelemetry
+  testTelemetry?: SessionTestTelemetry
   checksum?: string
 }
 
@@ -58,7 +78,7 @@ export function calculateDeltaChecksum(delta: SessionDelta): string {
 
 /**
  * SQLite WAL Transactional Storage Adapter for Session Continuity
- * Handles concurrent writes safely with BEGIN IMMEDIATE and busy_timeout.
+ * Handles concurrent writes safely with BEGIN IMMEDIATE, busy_timeout and exponential backoff retry.
  */
 export class TransactionalBrainAdapter {
   private db: DatabaseSync | null = null
@@ -112,33 +132,53 @@ export class TransactionalBrainAdapter {
   public saveDelta(delta: SessionDelta): boolean {
     if (!this.db || !this.isInitialized) return false
 
-    try {
-      const checksum = delta.checksum || calculateDeltaChecksum(delta)
-      delta.checksum = checksum
-      const payloadStr = JSON.stringify(delta)
-      const now = new Date().toISOString()
+    const maxRetries = 3
+    let attempt = 0
 
-      // Transactional safe write with BEGIN IMMEDIATE
-      this.db.exec('BEGIN IMMEDIATE;')
-      const stmt = this.db.prepare(`
-        INSERT INTO session_deltas (session_id, repository, active_agent, primary_goal, payload, checksum, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(session_id) DO UPDATE SET
-          primary_goal = excluded.primary_goal,
-          payload = excluded.payload,
-          checksum = excluded.checksum,
-          updated_at = excluded.updated_at
-        WHERE session_deltas.session_id = excluded.session_id;
-      `)
-      stmt.run(delta.sessionId, delta.repository, delta.activeAgent, delta.primaryGoal, payloadStr, checksum, delta.timestamp || now, now)
-      this.db.exec('COMMIT;')
-      return true
-    } catch (err: unknown) {
-      try { this.db.exec('ROLLBACK;') } catch {}
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[TransactionalBrainAdapter] Failed to save delta: ${msg}`)
-      return false
+    while (attempt < maxRetries) {
+      try {
+        const checksum = delta.checksum || calculateDeltaChecksum(delta)
+        delta.checksum = checksum
+        const payloadStr = JSON.stringify(delta)
+        const now = new Date().toISOString()
+
+        // Transactional safe write with BEGIN IMMEDIATE
+        this.db.exec('BEGIN IMMEDIATE;')
+        const stmt = this.db.prepare(`
+          INSERT INTO session_deltas (session_id, repository, active_agent, primary_goal, payload, checksum, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(session_id) DO UPDATE SET
+            primary_goal = excluded.primary_goal,
+            payload = excluded.payload,
+            checksum = excluded.checksum,
+            updated_at = excluded.updated_at
+          WHERE session_deltas.session_id = excluded.session_id;
+        `)
+        stmt.run(delta.sessionId, delta.repository, delta.activeAgent, delta.primaryGoal, payloadStr, checksum, delta.timestamp || now, now)
+        this.db.exec('COMMIT;')
+        return true
+      } catch (err: unknown) {
+        try { this.db.exec('ROLLBACK;') } catch {}
+        const msg = err instanceof Error ? err.message : String(err)
+
+        if (msg.includes('busy') || msg.includes('locked')) {
+          attempt++
+          const backoffMs = Math.min(50 * 2 ** attempt, 500)
+          const start = Date.now()
+          while (Date.now() - start < backoffMs) {
+            // Spin-wait for synchronous execution
+          }
+          if (attempt >= maxRetries) {
+            console.error(`[TransactionalBrainAdapter] SQLITE_BUSY retry exhausted after ${attempt} attempts: ${msg}`)
+            return false
+          }
+        } else {
+          console.error(`[TransactionalBrainAdapter] Failed to save delta: ${msg}`)
+          return false
+        }
+      }
     }
+    return false
   }
 
   public getLatestDelta(repository: string): SessionDelta | null {
@@ -181,7 +221,7 @@ export class TransactionalBrainAdapter {
 }
 
 /**
- * Engine for generating bounded, integrity-checked session deltas
+ * Engine for generating bounded, integrity-checked session deltas derived from factual repo telemetry
  */
 export class SessionDeltaEngine {
   private adapter: TransactionalBrainAdapter
@@ -199,6 +239,97 @@ export class SessionDeltaEngine {
     this.adapter = new TransactionalBrainAdapter(this.config)
   }
 
+  public extractGitTelemetry(cwd: string = process.cwd()): SessionGitTelemetry {
+    try {
+      const branch = execSync('git branch --show-current', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || 'HEAD'
+      const commitRaw = execSync('git log -1 --format="%h|%s"', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      const [commitHash = 'unknown', ...msgParts] = commitRaw.split('|')
+      const commitMessage = msgParts.join('|') || 'Initial or uncommitted state'
+
+      const statusRaw = execSync('git status --porcelain', { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      const lines = statusRaw ? statusRaw.split('\n').filter(Boolean) : []
+      const dirtyCount = lines.length
+      const modifiedFiles = lines.map(line => line.slice(3).trim()).slice(0, 10)
+
+      return {
+        branch,
+        commitHash,
+        commitMessage,
+        dirtyCount,
+        modifiedFiles,
+      }
+    } catch {
+      return {
+        branch: 'detached',
+        commitHash: '0000000',
+        commitMessage: 'Git telemetry unavailable',
+        dirtyCount: 0,
+        modifiedFiles: [],
+      }
+    }
+  }
+
+  public extractTestTelemetry(options: { configPath?: string; cwd?: string } = {}): SessionTestTelemetry {
+    const cwd = options.cwd || process.cwd()
+    const configPath = options.configPath || 'vitest.smoke.config.ts'
+    const start = Date.now()
+
+    try {
+      const cmd = `npx vitest run --config ${configPath}`
+      const output = execSync(cmd, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000 })
+      const durationMs = Date.now() - start
+
+      // Parse Vitest summary line: "Tests  6 passed (6)" or "Tests  1 failed | 5 passed (6)"
+      let passed = 0
+      let failed = 0
+      let total = 0
+
+      const passedMatch = output.match(/(\d+)\s+passed/i)
+      const failedMatch = output.match(/(\d+)\s+failed/i)
+      const totalMatch = output.match(/\((\d+)\)/)
+
+      if (passedMatch) passed = Number.parseInt(passedMatch[1]!, 10)
+      if (failedMatch) failed = Number.parseInt(failedMatch[1]!, 10)
+      if (totalMatch) total = Number.parseInt(totalMatch[1]!, 10)
+      if (total === 0) total = passed + failed
+
+      return {
+        passed,
+        failed,
+        total,
+        durationMs,
+        suitesPassed: failed === 0,
+      }
+    } catch (err: unknown) {
+      const durationMs = Date.now() - start
+      const output = (err as { stdout?: string; stderr?: string; message?: string }).stdout ||
+                     (err as { stderr?: string }).stderr ||
+                     (err instanceof Error ? err.message : String(err))
+
+      let passed = 0
+      let failed = 1
+      let total = 1
+
+      const passedMatch = output.match(/(\d+)\s+passed/i)
+      const failedMatch = output.match(/(\d+)\s+failed/i)
+      const totalMatch = output.match(/\((\d+)\)/)
+
+      if (passedMatch) passed = Number.parseInt(passedMatch[1]!, 10)
+      if (failedMatch) failed = Number.parseInt(failedMatch[1]!, 10)
+      if (totalMatch) total = Number.parseInt(totalMatch[1]!, 10)
+      if (total === 0) total = passed + Math.max(1, failed)
+
+      return {
+        passed,
+        failed: Math.max(1, failed),
+        total,
+        durationMs,
+        suitesPassed: false,
+        failureSummary: output.slice(0, 300).replace(/\r?\n/g, ' '),
+      }
+    }
+  }
+
   public createDelta(params: {
     sessionId?: string
     repository?: string
@@ -208,6 +339,8 @@ export class SessionDeltaEngine {
     resolvedBlockers?: string[]
     nextAction: string
     activeFiles?: string[]
+    gitTelemetry?: SessionGitTelemetry
+    testTelemetry?: SessionTestTelemetry
   }): SessionDelta {
     // Bounded slicing according to RITA audit recommendations
     const boundedDecisions = (params.decisions || []).slice(-this.config.maxDecisions)
@@ -218,12 +351,14 @@ export class SessionDeltaEngine {
       sessionId: params.sessionId || crypto.randomUUID(),
       timestamp: new Date().toISOString(),
       repository: params.repository || path.basename(process.cwd()),
-      activeAgent: params.activeAgent || 'rita',
+      activeAgent: params.activeAgent || 'antigravity',
       primaryGoal: params.primaryGoal,
       decisions: boundedDecisions,
       resolvedBlockers: boundedBlockers,
       nextAction: params.nextAction,
       activeFiles: boundedFiles,
+      gitTelemetry: params.gitTelemetry,
+      testTelemetry: params.testTelemetry,
     }
 
     rawDelta.checksum = calculateDeltaChecksum(rawDelta)
@@ -248,12 +383,43 @@ export class SessionDeltaEngine {
       ? delta.activeFiles.map(f => `\`${f}\``).join(', ')
       : 'N/A'
 
-    const mdContent = `# NEXT-SESSION.md — ${delta.repository} × Continuidad Soberana\n\n` +
-      `**Fecha:** ${delta.timestamp.split('T')[0]}\n` +
-      `**Agente Activo:** ${delta.activeAgent}\n` +
-      `**Objetivo Base:** ${delta.primaryGoal}\n` +
-      `**Integridad SHA:** \`${delta.checksum?.slice(0, 16)}...\`\n\n` +
+    // Git telemetry formatting
+    let gitStatusLine = 'N/A'
+    let treeStatusLine = '🟢 Limpio'
+    if (delta.gitTelemetry) {
+      gitStatusLine = `Rama \`${delta.gitTelemetry.branch}\` | Commit \`${delta.gitTelemetry.commitHash}\` (*${delta.gitTelemetry.commitMessage}*)`
+      treeStatusLine = delta.gitTelemetry.dirtyCount === 0
+        ? '🟢 Limpio (0 archivos pendientes)'
+        : `🟡 ${delta.gitTelemetry.dirtyCount} archivos modificados`
+    }
+
+    // Test telemetry formatting
+    let testStatusLine = '⚪ No ejecutados'
+    let testFailureBlock = ''
+    if (delta.testTelemetry) {
+      const durSec = (delta.testTelemetry.durationMs / 1000).toFixed(2)
+      if (delta.testTelemetry.suitesPassed) {
+        testStatusLine = `🟢 ${delta.testTelemetry.passed}/${delta.testTelemetry.total} PASS (Smoke tests en ${durSec}s)`
+      } else {
+        testStatusLine = `🔴 ${delta.testTelemetry.failed} FALLADOS | ${delta.testTelemetry.passed}/${delta.testTelemetry.total} PASS (en ${durSec}s)`
+        testFailureBlock = `\n## 🔴 BLOQUEO / RIESGO ACTIVO (Tests Fallando)\n` +
+          `> ⚠️ **Atención:** ${delta.testTelemetry.failed} tests fallaron en la última ejecución.\n` +
+          (delta.testTelemetry.failureSummary ? `> **Detalle:** \`${delta.testTelemetry.failureSummary}\`\n\n` : '\n')
+      }
+    }
+
+    const repoTitle = delta.repository.toUpperCase()
+    const mdContent = `# NEXT-SESSION — ${repoTitle} × Continuidad Soberana\n\n` +
+      `<!-- FACTUAL ARTIFACT DERIVED FROM REPO TELEMETRY (SHA-256: ${delta.checksum}) -->\n\n` +
+      `## 📊 Telemetría de Estado Verificable\n` +
+      `- **Fecha:** ${delta.timestamp.split('T')[0]} (${delta.timestamp.split('T')[1]?.slice(0, 8)} UTC)\n` +
+      `- **Agente Activo:** \`${delta.activeAgent}\`\n` +
+      `- **Git Telemetría:** ${gitStatusLine}\n` +
+      `- **Árbol de Trabajo:** ${treeStatusLine}\n` +
+      `- **Suites de Test:** ${testStatusLine}\n` +
+      `- **SHA-256 Verificación:** \`${delta.checksum}\`\n\n` +
       '---\n\n' +
+      (testFailureBlock ? `${testFailureBlock}---\n\n` : '') +
       '## 🎯 Últimas Decisiones & Arquitectura\n' +
       `${decisionsLines}\n\n` +
       '## 🛡️ Dolores de Cabeza & Bloqueos Eliminados\n' +
@@ -262,7 +428,14 @@ export class SessionDeltaEngine {
       `${filesLines}\n\n` +
       '---\n\n' +
       '## 🚀 Siguiente Acción Inmediata (Directiva del Punto)\n' +
-      `> **${delta.nextAction}**\n`
+      `> **${delta.nextAction}**\n\n` +
+      '## ⚡ Comandos Rápidos de Verificación:\n' +
+      '```powershell\n' +
+      '# 1. Ejecutar tests smoke\n' +
+      'pnpm run test:smoke\n\n' +
+      '# 2. Re-generar artefacto de continuidad verificado\n' +
+      'pnpm run dsh:next\n' +
+      '```\n'
 
     try {
       fs.writeFileSync(targetPath, mdContent, 'utf8')
@@ -316,7 +489,7 @@ export class WarmStartPrimer {
     if (fs.existsSync(nextSessionPath)) {
       try {
         const rawMd = fs.readFileSync(nextSessionPath, 'utf8')
-        const sliced = rawMd.slice(0, 1200) // Bound to ~300 tokens
+        const sliced = rawMd.slice(0, 750) // Bound strictly to ~180 tokens
         const injection = `[CONTINUIDAD INTER-SESIÓN (NEXT-SESSION.md)]:\n${sliced}`
         return {
           promptInjection: injection,
@@ -342,10 +515,10 @@ export class WarmStartPrimer {
     const filesSummary = delta.activeFiles.slice(0, 4).join(', ') || 'N/A'
 
     return `[CONTINUIDAD INTER-SESIÓN DSH | Agente: ${delta.activeAgent}]
-• Objetivo Anterior: ${delta.primaryGoal}
-• Decisiones Clave: ${decisionsSummary}
-• Archivos Foco: ${filesSummary}
-• Siguiente Acción: ${delta.nextAction}`
+• Objetivo: ${delta.primaryGoal}
+• Decisiones: ${decisionsSummary}
+• Archivos: ${filesSummary}
+• Siguiente: ${delta.nextAction}`
   }
 
   public close(): void {
