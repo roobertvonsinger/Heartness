@@ -1,14 +1,14 @@
 # NEXT-SESSION — DSH × Continuidad Soberana
 
-<!-- FACTUAL ARTIFACT DERIVED FROM REPO TELEMETRY (SHA-256: b0a759808859bd1e817ef8d8c63e8b7308030a9ae738321076f9163b0631786b) -->
+<!-- FACTUAL ARTIFACT DERIVED FROM REPO TELEMETRY (SHA-256: d1f7f32e63c1bdcef04bf61b66cf7c08faa91a4720ecf6e47abe861c0d4c98ec) -->
 
 ## 📊 Telemetría de Estado Verificable
-- **Fecha:** 2026-09-01 (05:41:02 UTC)
+- **Fecha:** 2026-09-01 (07:03:16 UTC)
 - **Agente Activo:** `antigravity`
-- **Git Telemetría:** Rama `master` | Commit `72a58edc0a` (*feat(continuity): refine type constraints and verifiable telemetry generation*)
+- **Git Telemetría:** Rama `master` | Commit `c9386bceb5` (*feat(guard): register adaptive pivoter in apply() and add sensitive_bypass intent category*)
 - **Árbol de Trabajo:** 🟡 29 archivos modificados
-- **Suites de Test:** 🟢 3/3 PASS (Smoke tests en 4.00s)
-- **SHA-256 Verificación:** `b0a759808859bd1e817ef8d8c63e8b7308030a9ae738321076f9163b0631786b`
+- **Suites de Test:** 🟢 4/4 PASS (Smoke tests en 4.01s)
+- **SHA-256 Verificación:** `d1f7f32e63c1bdcef04bf61b66cf7c08faa91a4720ecf6e47abe861c0d4c98ec`
 
 ---
 
