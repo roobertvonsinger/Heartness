@@ -25,7 +25,7 @@ export interface SessionTestTelemetry {
   total: number
   durationMs: number
   suitesPassed: boolean
-  failureSummary?: string
+  failureSummary?: string | undefined
 }
 
 export interface SessionDelta {
@@ -38,9 +38,9 @@ export interface SessionDelta {
   resolvedBlockers: string[]
   nextAction: string
   activeFiles: string[]
-  gitTelemetry?: SessionGitTelemetry
-  testTelemetry?: SessionTestTelemetry
-  checksum?: string
+  gitTelemetry?: SessionGitTelemetry | undefined
+  testTelemetry?: SessionTestTelemetry | undefined
+  checksum?: string | undefined
 }
 
 export interface WarmStartPayload {
@@ -52,12 +52,12 @@ export interface WarmStartPayload {
 }
 
 export interface SessionContinuityConfig {
-  dbPath?: string
-  walMode?: boolean
-  busyTimeout?: number
-  maxDecisions?: number
-  maxBlockers?: number
-  maxActiveFiles?: number
+  dbPath?: string | undefined
+  walMode?: boolean | undefined
+  busyTimeout?: number | undefined
+  maxDecisions?: number | undefined
+  maxBlockers?: number | undefined
+  maxActiveFiles?: number | undefined
 }
 
 /**
@@ -269,7 +269,7 @@ export class SessionDeltaEngine {
     }
   }
 
-  public extractTestTelemetry(options: { configPath?: string; cwd?: string } = {}): SessionTestTelemetry {
+  public extractTestTelemetry(options: { configPath?: string | undefined; cwd?: string | undefined } = {}): SessionTestTelemetry {
     const cwd = options.cwd || process.cwd()
     const configPath = options.configPath || 'vitest.smoke.config.ts'
     const start = Date.now()
@@ -288,9 +288,9 @@ export class SessionDeltaEngine {
       const failedMatch = output.match(/(\d+)\s+failed/i)
       const totalMatch = output.match(/\((\d+)\)/)
 
-      if (passedMatch) passed = Number.parseInt(passedMatch[1]!, 10)
-      if (failedMatch) failed = Number.parseInt(failedMatch[1]!, 10)
-      if (totalMatch) total = Number.parseInt(totalMatch[1]!, 10)
+      if (passedMatch && passedMatch[1]) passed = Number.parseInt(passedMatch[1], 10)
+      if (failedMatch && failedMatch[1]) failed = Number.parseInt(failedMatch[1], 10)
+      if (totalMatch && totalMatch[1]) total = Number.parseInt(totalMatch[1], 10)
       if (total === 0) total = passed + failed
 
       return {
@@ -314,9 +314,9 @@ export class SessionDeltaEngine {
       const failedMatch = output.match(/(\d+)\s+failed/i)
       const totalMatch = output.match(/\((\d+)\)/)
 
-      if (passedMatch) passed = Number.parseInt(passedMatch[1]!, 10)
-      if (failedMatch) failed = Number.parseInt(failedMatch[1]!, 10)
-      if (totalMatch) total = Number.parseInt(totalMatch[1]!, 10)
+      if (passedMatch && passedMatch[1]) passed = Number.parseInt(passedMatch[1], 10)
+      if (failedMatch && failedMatch[1]) failed = Number.parseInt(failedMatch[1], 10)
+      if (totalMatch && totalMatch[1]) total = Number.parseInt(totalMatch[1], 10)
       if (total === 0) total = passed + Math.max(1, failed)
 
       return {
@@ -331,16 +331,16 @@ export class SessionDeltaEngine {
   }
 
   public createDelta(params: {
-    sessionId?: string
-    repository?: string
-    activeAgent?: string
+    sessionId?: string | undefined
+    repository?: string | undefined
+    activeAgent?: string | undefined
     primaryGoal: string
-    decisions?: SessionDecision[]
-    resolvedBlockers?: string[]
+    decisions?: SessionDecision[] | undefined
+    resolvedBlockers?: string[] | undefined
     nextAction: string
-    activeFiles?: string[]
-    gitTelemetry?: SessionGitTelemetry
-    testTelemetry?: SessionTestTelemetry
+    activeFiles?: string[] | undefined
+    gitTelemetry?: SessionGitTelemetry | undefined
+    testTelemetry?: SessionTestTelemetry | undefined
   }): SessionDelta {
     // Bounded slicing according to RITA audit recommendations
     const boundedDecisions = (params.decisions || []).slice(-this.config.maxDecisions)

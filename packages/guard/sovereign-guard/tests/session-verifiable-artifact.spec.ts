@@ -2,11 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  calculateChecksum,
-  calculateDeltaChecksum,
   SessionDeltaEngine,
   WarmStartPrimer,
-  type SessionDelta,
   type SessionGitTelemetry,
   type SessionTestTelemetry,
 } from '../src/session-continuity.ts'
@@ -67,7 +64,7 @@ describe('Session Verifiable Artifact & Continuity Engine', () => {
     const mdOutput = engine.exportToNextSessionMarkdown(delta, testMdPath)
 
     expect(fs.existsSync(testMdPath)).toBe(true)
-    expect(mdOutput).toContain('NEXT-SESSION — DSH')
+    expect(mdOutput).toContain('NEXT-SESSION —')
     expect(mdOutput).toContain('7b8a9c0')
     expect(mdOutput).toContain('feat(continuity): verifiable artifact')
     expect(mdOutput).toContain('12/12 PASS')

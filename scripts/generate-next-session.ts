@@ -35,19 +35,23 @@ function parseArgs(): {
   let outputPath: string | undefined
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i]!
+    const arg = args[i] ?? ''
     if (arg === '--no-tests' || arg === '--skip-tests') {
       skipTests = true
     } else if (arg === '--full-tests') {
       fullTests = true
     } else if ((arg === '--intent' || arg === '-i') && i + 1 < args.length) {
-      intent = args[++i]!
+      i++
+      intent = args[i] ?? intent
     } else if ((arg === '--next' || arg === '-n') && i + 1 < args.length) {
-      nextAction = args[++i]!
+      i++
+      nextAction = args[i] ?? nextAction
     } else if ((arg === '--agent' || arg === '-a') && i + 1 < args.length) {
-      agent = args[++i]!
+      i++
+      agent = args[i] ?? agent
     } else if ((arg === '--out' || arg === '-o') && i + 1 < args.length) {
-      outputPath = args[++i]!
+      i++
+      outputPath = args[i]
     }
   }
 
