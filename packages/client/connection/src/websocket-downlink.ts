@@ -82,6 +82,44 @@ export class WebSocketDownlinks {
   }
 
   /**
+   * Upgrade one socket for Canvas events (ProgressPill / Progressive Streaming Relay).
+   * Bridges frames to/from Cordis `progress/session-connect` and `progress/session-disconnect`.
+   * @param req - HTTP upgrade request.
+   * @param socket - Raw socket transferred by the HTTP server.
+   * @param head - Bytes already read after the upgrade headers.
+   * @param ctx - Cordis Context dispatching events.
+   */
+  handleCanvas(
+    req: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+    ctx: { emit: (event: string, payload: unknown) => void },
+  ): void {
+    this.server.handleUpgrade(req, socket, head, (websocket) => {
+      const sessionId = `canvas-${randomUUID()}`
+      const emitter = (frame: unknown) => {
+        if (websocket.readyState === WebSocket.OPEN) {
+          websocket.send(JSON.stringify(frame), () => {})
+        }
+      }
+
+      ctx.emit('progress/session-connect', { sessionId, emitter })
+
+      websocket.once('close', () => {
+        ctx.emit('progress/session-disconnect', { sessionId })
+      })
+
+      websocket.once('error', () => {
+        ctx.emit('progress/session-disconnect', { sessionId })
+      })
+
+      websocket.on('message', () => {
+        // Downlink only
+      })
+    })
+  }
+
+  /**
    * Terminate owned sockets and await the no-server acceptor plus frame pumps.
    * @returns A promise resolving after every socket and source iterator stops.
    */

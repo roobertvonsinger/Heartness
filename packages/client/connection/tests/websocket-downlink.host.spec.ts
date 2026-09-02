@@ -7,7 +7,7 @@ import type {
   ApiProxy, HostFrame, MuxFrame, RpcRequest, ServerRequest,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
-import { HOST_EVENTS_PATH, MUX_EVENTS_PATH } from '../src/api-path.ts'
+import { CANVAS_EVENTS_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from '../src/api-path.ts'
 import { WebSocketDownlinks } from '../src/websocket-downlink.ts'
 
 type MuxSource = (signal: AbortSignal) => AsyncIterable<RpcRequest<MuxFrame>>
@@ -39,7 +39,10 @@ function api(mux: MuxSource, host: HostSource): ApiProxy {
   } as ApiProxy
 }
 
-async function serve(downlinks: WebSocketDownlinks): Promise<{
+async function serve(
+  downlinks: WebSocketDownlinks,
+  ctx?: { emit: (event: string, payload: unknown) => void },
+): Promise<{
   origin: string
   close: () => Promise<void>
 }> {
@@ -48,6 +51,7 @@ async function serve(downlinks: WebSocketDownlinks): Promise<{
     const pathname = new URL(request.url ?? '/', 'http://dsh.internal').pathname
     if (pathname === MUX_EVENTS_PATH) downlinks.handleMux(request, socket, head)
     else if (pathname === HOST_EVENTS_PATH) downlinks.handleHost(request, socket, head)
+    else if (pathname === CANVAS_EVENTS_PATH && ctx) downlinks.handleCanvas(request, socket, head, ctx)
     else socket.destroy()
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -305,4 +309,80 @@ describe('WebSocket downlinks', () => {
       await closing
     }
   })
+
+  it('bridges canvas events down to client via Cordis progress/session-connect', async () => {
+    let sessionEmitter: ((frame: unknown) => void) | undefined
+    let connectedSessionId: string | undefined
+    const fakeCtx = {
+      emit: (event: string, payload: unknown) => {
+        if (event === 'progress/session-connect') {
+          const ev = payload as { sessionId: string; emitter: (frame: unknown) => void }
+          connectedSessionId = ev.sessionId
+          sessionEmitter = ev.emitter
+        }
+      },
+    }
+
+    const downlinks = new WebSocketDownlinks(api(idle, idle))
+    const host = await serve(downlinks, fakeCtx)
+    running.push(host.close)
+
+    const socket = new WebSocket(`${host.origin}${CANVAS_EVENTS_PATH}`)
+    await once(socket, 'open')
+
+    await vi.waitFor(() => {
+      expect(sessionEmitter).toBeDefined()
+      expect(connectedSessionId).toMatch(/^canvas-/)
+    })
+
+    const nextMessage = once(socket, 'message')
+    const testFrame = {
+      type: 'progress_pill',
+      pill: 'Sincronizando estado con cabina...',
+      category: 'exec',
+      toolName: 'run_command',
+      timestamp: Date.now(),
+      ephemeral: true,
+    }
+
+    sessionEmitter!(testFrame)
+
+    const [data] = await nextMessage
+    const parsed = JSON.parse(String(data))
+    expect(parsed).toEqual(testFrame)
+
+    socket.close()
+  })
+
+  it('notifies Cordis progress/session-disconnect when canvas socket closes', async () => {
+    let disconnectedSessionId: string | undefined
+    let connectedSessionId: string | undefined
+    const fakeCtx = {
+      emit: (event: string, payload: unknown) => {
+        if (event === 'progress/session-connect') {
+          connectedSessionId = (payload as { sessionId: string }).sessionId
+        } else if (event === 'progress/session-disconnect') {
+          disconnectedSessionId = (payload as { sessionId: string }).sessionId
+        }
+      },
+    }
+
+    const downlinks = new WebSocketDownlinks(api(idle, idle))
+    const host = await serve(downlinks, fakeCtx)
+    running.push(host.close)
+
+    const socket = new WebSocket(`${host.origin}${CANVAS_EVENTS_PATH}`)
+    await once(socket, 'open')
+
+    await vi.waitFor(() => {
+      expect(connectedSessionId).toBeDefined()
+    })
+
+    socket.close()
+
+    await vi.waitFor(() => {
+      expect(disconnectedSessionId).toBe(connectedSessionId)
+    })
+  })
 })
+
