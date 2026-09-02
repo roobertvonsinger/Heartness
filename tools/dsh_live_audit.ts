@@ -19,6 +19,24 @@ import {
 import type { ExecutionStepTrace } from '../packages/guard/sovereign-guard/src/reflexive-learner.ts'
 import type { TrajectoryTrace } from '../packages/guard/sovereign-guard/src/htc-calibrator.ts'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import fs from 'node:fs'
+
+// Load .env if present
+const envPath = fileURLToPath(new URL('../.env', import.meta.url))
+if (fs.existsSync(envPath)) {
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n')
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq > 0) {
+      const k = trimmed.slice(0, eq).trim()
+      const v = trimmed.slice(eq + 1).trim()
+      if (!process.env[k]) process.env[k] = v
+    }
+  }
+}
 
 interface DiagnosticSection {
   name: string
