@@ -189,6 +189,19 @@ export interface ProgressFrame {
   ephemeral: true
 }
 
+export interface BringToViewFrame {
+  type: 'bring_to_view'
+  targetId: string
+  label?: string
+  x?: number
+  y?: number
+  scale?: number
+  durationMs?: number
+  timestamp: number
+}
+
+export type CanvasEventFrame = ProgressFrame | BringToViewFrame
+
 export interface ToneGovernorConfig {
   enabled?: boolean
   stripSycophancy?: boolean

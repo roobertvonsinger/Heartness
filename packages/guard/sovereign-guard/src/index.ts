@@ -95,6 +95,8 @@ export type {
   AdaptivePivoterConfig,
   ProgressStreamConfig,
   ProgressFrame,
+  BringToViewFrame,
+  CanvasEventFrame,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'

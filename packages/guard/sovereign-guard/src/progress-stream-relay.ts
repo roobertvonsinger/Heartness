@@ -10,20 +10,20 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ProgressStreamConfig, ProgressFrame } from './types.ts'
+import type { ProgressStreamConfig, ProgressFrame, BringToViewFrame, CanvasEventFrame } from './types.ts'
 import type { StepPill } from './step-feedback.ts'
 
 export interface ProgressRelaySession {
-  /** Send a progress frame to the connected client */
-  send(frame: ProgressFrame): void
+  /** Send a progress or bring-to-view frame to the connected client */
+  send(frame: CanvasEventFrame): void
   /** Stop the relay and clean up */
   stop(): void
   /** Check if relay is active */
   isActive(): boolean
   /** Get total frames emitted */
   getFrameCount(): number
-  /** Get the pill history for this session */
-  getHistory(): ProgressFrame[]
+  /** Get the frame history for this session */
+  getHistory(): CanvasEventFrame[]
 }
 
 /**
@@ -182,17 +182,17 @@ export function createCompletionFrame(
  * Creates a relay session that collects and can replay progress frames.
  */
 export function createProgressRelaySession(
-  emitter: (frame: ProgressFrame) => void,
+  emitter: (frame: CanvasEventFrame) => void,
   config: ProgressStreamConfig = {},
 ): ProgressRelaySession {
-  const history: ProgressFrame[] = []
+  const history: CanvasEventFrame[] = []
   let active = true
   let frameCount = 0
 
   const maxHistory = 50 // Keep last 50 frames for debugging
 
   return {
-    send(frame: ProgressFrame): void {
+    send(frame: CanvasEventFrame): void {
       if (!active) return
       frameCount++
       history.push(frame)
@@ -301,8 +301,32 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
     }
   })
 
+  // Listen for bring-to-view events to broadcast camera guidance frames to connected canvas clients
+  ctx.on('canvas/bring-to-view' as never, (event: unknown) => {
+    if (!event || typeof event !== 'object') return
+    const ev = event as Record<string, unknown>
+    const frame: BringToViewFrame = {
+      type: 'bring_to_view',
+      targetId: String(ev.targetId || ev.target || ev.node || 'nodeA'),
+      label: typeof ev.label === 'string' ? ev.label : undefined,
+      x: typeof ev.x === 'number' ? ev.x : undefined,
+      y: typeof ev.y === 'number' ? ev.y : undefined,
+      scale: typeof ev.scale === 'number' ? ev.scale : undefined,
+      durationMs: typeof ev.durationMs === 'number' ? ev.durationMs : undefined,
+      timestamp: typeof ev.timestamp === 'number' ? ev.timestamp : Date.now(),
+    }
+
+    for (const session of sessions.values()) {
+      if (session.isActive()) {
+        session.send(frame)
+      }
+    }
+
+    ctx.emit('progress/stream-frame' as never, frame)
+  })
+
   // Expose session management on the context for WebSocket handlers
-  ctx.on('progress/session-connect' as never, (event: { sessionId: string; emitter: (frame: ProgressFrame) => void }) => {
+  ctx.on('progress/session-connect' as never, (event: { sessionId: string; emitter: (frame: CanvasEventFrame) => void }) => {
     const session = createProgressRelaySession(event.emitter, config)
     sessions.set(event.sessionId, session)
   })

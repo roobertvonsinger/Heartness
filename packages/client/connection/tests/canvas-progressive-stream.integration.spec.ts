@@ -6,8 +6,8 @@ import WebSocket from 'ws'
 import { Context } from '@deepseek-ai/cordis'
 import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { registerProgressStreamRelay } from '../../../guard/sovereign-guard/src/progress-stream-relay.ts'
-import { generateStepPill } from '../../../guard/sovereign-guard/src/step-feedback.ts'
-import type { ProgressFrame } from '../../../guard/sovereign-guard/src/types.ts'
+import { generateStepPill, registerStepFeedback, globalSteeringQueue } from '../../../guard/sovereign-guard/src/step-feedback.ts'
+import type { ProgressFrame, BringToViewFrame } from '../../../guard/sovereign-guard/src/types.ts'
 import { CANVAS_EVENTS_PATH } from '../src/api-path.ts'
 import { WebSocketDownlinks } from '../src/websocket-downlink.ts'
 
@@ -153,6 +153,79 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
 
     expect(receivedFrames[1]!.pill).toContain('Inspeccionando')
     expect(receivedFrames[1]!.toolName).toBe('_coalesced')
+
+    ws.close()
+  })
+
+  it('delivers bring_to_view frames over /api/canvas/events in real time (<16ms)', async () => {
+    const ctx = new Context()
+    registerProgressStreamRelay(ctx)
+
+    const downlinks = new WebSocketDownlinks(dummyApi())
+    const host = await serveCanvas(downlinks, ctx)
+    running.push(host.close)
+
+    const ws = new WebSocket(`${host.origin}${CANVAS_EVENTS_PATH}`)
+    await once(ws, 'open')
+
+    const received: BringToViewFrame[] = []
+    ws.on('message', (data) => {
+      const parsed = JSON.parse(String(data))
+      if (parsed.type === 'bring_to_view') {
+        received.push(parsed)
+      }
+    })
+
+    const start = performance.now()
+    ctx.emit('canvas/bring-to-view' as never, {
+      targetId: 'nodeB',
+      label: 'Nodo B',
+      scale: 1.35,
+      durationMs: 450,
+      timestamp: Date.now(),
+    })
+
+    await vi.waitFor(() => {
+      expect(received.length).toBe(1)
+    }, { timeout: 1000 })
+
+    const latency = performance.now() - start
+    expect(latency).toBeLessThan(100)
+    expect(received[0]!.targetId).toBe('nodeB')
+    expect(received[0]!.scale).toBe(1.35)
+
+    ws.close()
+  })
+
+  it('bridges upstream steer directives from canvas client to Cordis mid-turn steering', async () => {
+    const ctx = new Context()
+    registerStepFeedback(ctx)
+
+    const downlinks = new WebSocketDownlinks(dummyApi())
+    const host = await serveCanvas(downlinks, ctx)
+    running.push(host.close)
+
+    const ws = new WebSocket(`${host.origin}${CANVAS_EVENTS_PATH}`)
+    await once(ws, 'open')
+
+    let steeredEvent: { directive?: string; text?: string; sessionId?: string } | undefined
+    ctx.on('user/mid-turn-input', (ev) => {
+      steeredEvent = ev as { directive?: string; text?: string; sessionId?: string }
+    })
+
+    // Browser sends an in-flight steering directive over canvas events WS
+    ws.send(JSON.stringify({
+      type: 'steer',
+      directive: 'Enfócate en la arquitectura de red primero',
+      sessionId: 'canvas-steer-test',
+    }))
+
+    await vi.waitFor(() => {
+      expect(steeredEvent).toBeDefined()
+    }, { timeout: 1000 })
+
+    expect(steeredEvent!.directive).toBe('Enfócate en la arquitectura de red primero')
+    expect(globalSteeringQueue.hasPending('canvas-steer-test')).toBe(true)
 
     ws.close()
   })

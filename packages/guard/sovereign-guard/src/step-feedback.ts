@@ -222,6 +222,18 @@ export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = 
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown> }
     const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {})
     ctx.emit('progress/step-pill', pill)
+
+    // Focus target node if tool targets a visual entity
+    if (ev.args && typeof ev.args === 'object') {
+      const targetId = (ev.args.nodeId || ev.args.targetId || ev.args.node || (ev.args.target as string))
+      if (typeof targetId === 'string' && targetId.trim()) {
+        ctx.emit('canvas/bring-to-view' as never, {
+          targetId: targetId.trim(),
+          label: targetId.trim(),
+          timestamp: Date.now(),
+        })
+      }
+    }
   })
 
   ctx.on('tool/after-execute', (event: unknown) => {
@@ -233,12 +245,33 @@ export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = 
     }
   })
 
-  // Hook user input during active run
+  // Hook user input / steering during active run
   ctx.on('user/mid-turn-input', (event: unknown) => {
     if (event && typeof event === 'object') {
-      const ev = event as { sessionId?: string; text?: string }
-      if (ev.sessionId && ev.text) {
-        globalSteeringQueue.push(ev.sessionId, ev.text)
+      const ev = event as { sessionId?: string; text?: string; directive?: string }
+      const dir = (ev.directive || ev.text)?.trim()
+      const sid = ev.sessionId || 'default'
+      if (dir) {
+        globalSteeringQueue.push(sid, dir)
+        ctx.emit('steering/queued' as never, { sessionId: sid, directive: dir })
+      }
+    }
+  })
+
+  // Hook agent/pre-step to inject pending mid-turn steering directives into active conversation without restart
+  ctx.on('agent/pre-step' as never, async (payload: any) => {
+    const sessionId = payload?.agent?.sessionId || payload?.sessionId || 'default'
+    if (globalSteeringQueue.hasPending(sessionId)) {
+      const injection = globalSteeringQueue.consumeFormattedContext(sessionId)
+      if (injection) {
+        if (payload?.messages && Array.isArray(payload.messages)) {
+          payload.messages.push({
+            role: 'user',
+            content: injection,
+            metadata: { isMidTurnSteering: true, timestamp: Date.now() },
+          })
+        }
+        ctx.emit('steering/injected' as never, { sessionId, injection })
       }
     }
   })

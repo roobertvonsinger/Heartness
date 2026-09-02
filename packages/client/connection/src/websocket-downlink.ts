@@ -113,8 +113,25 @@ export class WebSocketDownlinks {
         ctx.emit('progress/session-disconnect', { sessionId })
       })
 
-      websocket.on('message', () => {
-        // Downlink only
+      websocket.on('message', (raw) => {
+        try {
+          const str = String(raw)
+          const data = JSON.parse(str)
+          if (data.type === 'steer' || data.type === 'directive') {
+            ctx.emit('user/mid-turn-input', {
+              sessionId: data.sessionId || sessionId,
+              text: data.directive || data.text || data.content,
+              directive: data.directive || data.text || data.content,
+            })
+          } else if (data.type === 'bring_to_view' || data.type === 'focus') {
+            ctx.emit('canvas/bring-to-view', {
+              sessionId,
+              ...data,
+            })
+          }
+        } catch {
+          // Downlink primarily; ignore malformed upstream frames
+        }
       })
     })
   }
@@ -153,6 +170,12 @@ export class WebSocketDownlinks {
             ctx.emit('voice/audio-chunk', { sessionId, ...data })
           } else if (data.type === 'voice_toggle') {
             ctx.emit('voice/toggle', { sessionId, enabled: data.enabled })
+          } else if (data.type === 'steer' || data.type === 'directive') {
+            ctx.emit('user/mid-turn-input', {
+              sessionId: data.sessionId || sessionId,
+              text: data.directive || data.text || data.content,
+              directive: data.directive || data.text || data.content,
+            })
           } else {
             ctx.emit('voice/message', { sessionId, payload: data })
           }

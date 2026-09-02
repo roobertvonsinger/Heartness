@@ -42,7 +42,7 @@ export class VoiceEngine {
     this.onError = config.onError
 
     // Load persisted voice state from localStorage
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('dsh_voice_enabled')
       this.isVoiceEnabled = stored !== null ? stored === 'true' : (config.voiceEnabledDefault ?? true)
     }
@@ -59,7 +59,7 @@ export class VoiceEngine {
   /** Toggle Voice ON / OFF */
   public setVoiceEnabled(enabled: boolean): void {
     this.isVoiceEnabled = enabled
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       localStorage.setItem('dsh_voice_enabled', String(enabled))
     }
 
@@ -125,6 +125,22 @@ export class VoiceEngine {
       this.stopPtt()
     } else {
       void this.startPtt()
+    }
+  }
+
+  /**
+   * Send an in-flight steering directive to MidTurnSteeringQueue over WebSocket.
+   * Allows steering running execution without restarting or regenerating the base prompt.
+   */
+  public sendSteeringDirective(directive: string): void {
+    const clean = directive.trim()
+    if (!clean) return
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'steer',
+        directive: clean,
+        timestamp: Date.now(),
+      }))
     }
   }
 

@@ -13,6 +13,7 @@ import type {
   VoiceModifiers,
   CartesiaStreamRequest,
   ElevenLabsStreamRequest,
+  BringToViewFrame,
 } from './types.ts'
 
 export interface DualTrackResult {
@@ -24,6 +25,7 @@ export interface DualTrackResult {
   cartesiaPayload?: CartesiaStreamRequest | undefined
   elevenlabsPayload?: ElevenLabsStreamRequest | undefined
   ttsProfile: CartesiaVoiceProfile | ElevenLabsVoiceProfile
+  bringToView?: BringToViewFrame | undefined
 }
 
 /**
@@ -391,17 +393,66 @@ export function extractDualTrackPayload(
   let hasExplicitVoiceTag = false
   let modifiers: VoiceModifiers = {}
 
+  // 1. Bring-to-view tag extraction (<bring_to_view target="nodeA" ... /> or <focus node="nodeA" ... />)
+  const bringRegex = /<(?:bring_to_view|focus)(?:\s+([^>]*))?\s*\/?>/i
+  const bringMatch = rawMessage.match(bringRegex)
+  let bringToView: BringToViewFrame | undefined = undefined
+
+  if (bringMatch) {
+    const attrString = bringMatch[1] ?? ''
+    const rawAttrs: Record<string, string> = {}
+    const attrRegex = /(\w+)=["']([^"']*)["']/g
+    let m: RegExpExecArray | null = null
+    while ((m = attrRegex.exec(attrString)) !== null) {
+      if (m[1] && m[2] !== undefined) {
+        rawAttrs[m[1].toLowerCase()] = m[2]
+      }
+    }
+    const targetId = rawAttrs.target || rawAttrs.node || rawAttrs.nodeid || rawAttrs.id || 'nodeA'
+    bringToView = {
+      type: 'bring_to_view',
+      targetId,
+      label: rawAttrs.label || (targetId === 'nodeA' ? 'Nodo A' : targetId === 'nodeB' ? 'Nodo B' : targetId),
+      x: rawAttrs.x !== undefined ? Number(rawAttrs.x) : undefined,
+      y: rawAttrs.y !== undefined ? Number(rawAttrs.y) : undefined,
+      scale: rawAttrs.scale !== undefined ? Number(rawAttrs.scale) : undefined,
+      durationMs: rawAttrs.duration !== undefined ? Number(rawAttrs.duration) : undefined,
+      timestamp: Date.now(),
+    }
+    writtenText = writtenText.replace(bringRegex, '').replace(/[ \t]{2,}/g, ' ').trim()
+  } else {
+    // 2. Semantic node mention detection ("Nodo A" / "Nodo B")
+    if (/\bnodo\s+a\b/i.test(rawMessage)) {
+      bringToView = {
+        type: 'bring_to_view',
+        targetId: 'nodeA',
+        label: 'Nodo A',
+        timestamp: Date.now(),
+      }
+    } else if (/\bnodo\s+b\b/i.test(rawMessage)) {
+      bringToView = {
+        type: 'bring_to_view',
+        targetId: 'nodeB',
+        label: 'Nodo B',
+        timestamp: Date.now(),
+      }
+    }
+  }
+
   if (match && match[2]) {
     hasExplicitVoiceTag = true
     const attrString = match[1] ?? ''
     modifiers = parseVoiceTagAttributes(attrString)
     // El texto dentro del tag explícito <voice> no se trunca arbitrariamente
     speechText = cleanMarkdownForSpeech(match[2].trim())
-    writtenText = rawMessage.replace(voiceTagRegex, '').trim()
+    writtenText = writtenText.replace(voiceTagRegex, '').replace(/[ \t]{2,}/g, ' ').trim()
   } else {
     hasExplicitVoiceTag = false
-    speechText = cleanMarkdownForSpeech(rawMessage, maxSpeechChars ?? 400)
+    speechText = cleanMarkdownForSpeech(writtenText, maxSpeechChars ?? 400)
   }
+
+  // Clean any remaining bring_to_view tags from speechText
+  speechText = speechText.replace(bringRegex, '').replace(/[ \t]{2,}/g, ' ').trim()
 
   // Selección del proveedor efectivo (override del tag > config > default auto)
   let provider: 'cartesia' | 'elevenlabs' = 'cartesia'
@@ -444,6 +495,7 @@ export function extractDualTrackPayload(
     cartesiaPayload,
     elevenlabsPayload,
     ttsProfile,
+    bringToView,
   }
 }
 
@@ -479,6 +531,11 @@ export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig 
       cartesiaPayload: dualTrack.cartesiaPayload,
       elevenlabsPayload: dualTrack.elevenlabsPayload,
       profile: dualTrack.ttsProfile,
+      bringToView: dualTrack.bringToView,
+    }
+
+    if (dualTrack.bringToView) {
+      ctx.emit('canvas/bring-to-view' as never, dualTrack.bringToView)
     }
 
     ctx.emit('voice/speech-ready' as never, payload.speechPayload)

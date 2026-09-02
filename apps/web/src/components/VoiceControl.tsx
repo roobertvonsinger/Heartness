@@ -58,10 +58,12 @@ export const VoiceControl: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
+    ;(window as unknown as { __dsh_voice_engine?: VoiceEngine }).__dsh_voice_engine = vEngine
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
+      delete (window as unknown as { __dsh_voice_engine?: unknown }).__dsh_voice_engine
       vEngine.destroy()
     }
   }, [])
