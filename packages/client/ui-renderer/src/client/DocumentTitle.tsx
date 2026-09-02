@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-const DEFAULT_CLIENT_TITLE = 'DeepSick Hardness (DSH)'
+const DEFAULT_CLIENT_TITLE = 'Heartness'
 
 /** Props for the browser title projection. */
 export interface DocumentTitleProps {
