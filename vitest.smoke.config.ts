@@ -17,6 +17,8 @@ export default defineConfig({
       'packages/guard/sovereign-guard/tests/session-verifiable-artifact.spec.ts',
       'packages/guard/sovereign-guard/tests/sovereign-presets.spec.ts',
       'packages/guard/sovereign-guard/tests/chaos-resilience.spec.ts',
+      'packages/guard/sovereign-guard/tests/cordis-rita-integration.spec.ts',
+      'packages/guard/sovereign-guard/tests/progress-stream-relay.spec.ts',
     ],
     testTimeout: 10_000,
     hookTimeout: 5_000,

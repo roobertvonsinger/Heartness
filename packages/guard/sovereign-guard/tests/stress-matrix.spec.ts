@@ -34,7 +34,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       const execPayload = { name: 'run_terminal', callId: 'call-999' }
       const rawResult = { content: [{ type: 'text' as const, text: massiveLogOutput }] }
 
-      const decision = await ctx.waterfall(
+      const decision: any = await ctx.waterfall(
         'tools/post-execute',
         execPayload as any,
         rawResult as any,
@@ -80,7 +80,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       const readExec = { name: 'read', callId: 'call-read-01' }
       const readResult = { content: [{ type: 'text' as const, text: largeContent }] }
 
-      const decision = await ctx.waterfall(
+      const decision: any = await ctx.waterfall(
         'tools/post-execute',
         readExec as any,
         readResult as any,
@@ -126,18 +126,20 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       }
 
       const agent = { options: { model: 'venice-uncensored-1-2' } } as any
-      const decision = await ctx.waterfall(
+      const decision: any = await ctx.waterfall(
         'agent/pre-step',
-        { agent, messages },
+        { agent, messages } as any,
         () => ({ kind: 'enter', messages }),
       )
 
       expect(decision.kind).toBe('enter')
       if (decision.kind === 'enter') {
         // Must preserve first message (Root Objective)
-        expect(decision.messages[0].content[0].type === 'text' ? decision.messages[0].content[0].text : '').toContain('Root Objective')
+        const msg0 = decision.messages[0]?.content[0] as any
+        expect(msg0?.text || '').toContain('Root Objective')
         // Second message must be context isolator notice
-        expect(decision.messages[1].content[0].type === 'text' ? decision.messages[1].content[0].text : '').toContain('CONTEXT ISOLATOR')
+        const msg1 = decision.messages[1]?.content[0] as any
+        expect(msg1?.text || '').toContain('CONTEXT ISOLATOR')
         // Total messages bounded to initial + notice + maxTurns (3)
         expect(decision.messages.length).toBeLessThanOrEqual(5)
       }
@@ -244,7 +246,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       })
 
       // Generate 20 turns of messages
-      const history = []
+      const history: any[] = []
       for (let t = 1; t <= 20; t++) {
         history.push(createUserMessage({
           content: [{ type: 'text', text: `Dossier Item ${t}: Extensive telemetry analytics chunk` }],
@@ -254,9 +256,9 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
 
       // 1. Initial run on Gemini 3.7 Flash High (1M window -> holds all 20 turns)
       const geminiAgent = { options: { model: 'ag/gemini-3.7-flash-high' } } as any
-      const gDec = await ctx.waterfall(
+      const gDec: any = await ctx.waterfall(
         'agent/pre-step',
-        { agent: geminiAgent, messages: history },
+        { agent: geminiAgent, messages: history } as any,
         () => ({ kind: 'enter', messages: history }),
       )
       expect(gDec.kind).toBe('enter')
@@ -266,30 +268,32 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
 
       // 2. Abrupt mid-session switch to Venice Uncensored (strict 3 turns)
       const veniceAgent = { options: { model: 'olafangensan-glm-4.7-flash-heretic' } } as any
-      const vDec = await ctx.waterfall(
+      const vDec: any = await ctx.waterfall(
         'agent/pre-step',
-        { agent: veniceAgent, messages: history },
+        { agent: veniceAgent, messages: history } as any,
         () => ({ kind: 'enter', messages: history }),
       )
       expect(vDec.kind).toBe('enter')
       if (vDec.kind === 'enter') {
         // Root + Notice + 3 Tail turns = 5 items
         expect(vDec.messages.length).toBe(5)
-        expect(vDec.messages[1].content[0].type === 'text' ? vDec.messages[1].content[0].text : '').toContain('Omitted 16 older conversational turns')
+        const msg1 = vDec.messages[1]?.content[0] as any
+        expect(msg1?.text || '').toContain('Omitted 16 older conversational turns')
       }
 
       // 3. Switch to Codestral (10 turns)
       const codestralAgent = { options: { model: 'mistral/codestral-latest' } } as any
-      const cDec = await ctx.waterfall(
+      const cDec: any = await ctx.waterfall(
         'agent/pre-step',
-        { agent: codestralAgent, messages: history },
+        { agent: codestralAgent, messages: history } as any,
         () => ({ kind: 'enter', messages: history }),
       )
       expect(cDec.kind).toBe('enter')
       if (cDec.kind === 'enter') {
         // Root + Notice + 10 Tail turns = 12 items
         expect(cDec.messages.length).toBe(12)
-        expect(cDec.messages[1].content[0].type === 'text' ? cDec.messages[1].content[0].text : '').toContain('Omitted 9 older conversational turns')
+        const msg1 = cDec.messages[1]?.content[0] as any
+        expect(msg1?.text || '').toContain('Omitted 9 older conversational turns')
       }
     })
   })

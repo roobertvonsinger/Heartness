@@ -167,6 +167,28 @@ export interface StepFeedbackConfig {
   hotSteeringEnabled?: boolean
 }
 
+export interface ProgressStreamConfig {
+  enabled?: boolean
+  /** Minimum interval between pill emissions (ms). Prevents WS saturation. Default: 200 */
+  rateLimitMs?: number
+  /** Max pills visible simultaneously in the frontend. Default: 2 */
+  maxVisiblePills?: number
+  /** Auto-dismiss pill after this duration (ms). Default: 3000 */
+  ephemeralTtlMs?: number
+  /** Coalesce N rapid same-category pills into a single summary. Default: 3 */
+  coalesceThreshold?: number
+}
+
+export interface ProgressFrame {
+  type: 'progress_pill'
+  pill: string
+  category: 'read' | 'write' | 'exec' | 'search' | 'info' | 'error' | 'complete'
+  toolName: string
+  timestamp: number
+  durationMs?: number
+  ephemeral: true
+}
+
 export interface ToneGovernorConfig {
   enabled?: boolean
   stripSycophancy?: boolean
@@ -501,6 +523,7 @@ export interface SovereignGuardConfig {
   executiveCognition?: ExecutiveCognitionConfig
   voiceGateway?: DualTrackVoiceConfig
   adaptivePivoter?: AdaptivePivoterConfig
+  progressStream?: ProgressStreamConfig
 }
 
 export const ModelRule: z<ModelRule> = z.object({
@@ -638,6 +661,14 @@ export const StepFeedbackConfig: z<StepFeedbackConfig> = z.object({
   maxPillLength: z.number().default(100),
   ephemeralStreaming: z.boolean().default(true),
   hotSteeringEnabled: z.boolean().default(true),
+})
+
+export const ProgressStreamConfig: z<ProgressStreamConfig> = z.object({
+  enabled: z.boolean().default(true),
+  rateLimitMs: z.number().default(200),
+  maxVisiblePills: z.number().default(2),
+  ephemeralTtlMs: z.number().default(3000),
+  coalesceThreshold: z.number().default(3),
 })
 
 export const ToneGovernorConfig: z<ToneGovernorConfig> = z.object({
@@ -835,4 +866,5 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   brainGraph: BrainGraphConfig.default({}),
   openDesign: OpenDesignConfig.default({}),
   adaptivePivoter: AdaptivePivoterConfig.default({}),
+  progressStream: ProgressStreamConfig.default({}),
 })

@@ -7,15 +7,15 @@ describe('SovereignPresets Registry', () => {
     expect(SOVEREIGN_PRESETS['zero-guardrail']).toBeDefined()
     expect(SOVEREIGN_PRESETS['deep-refactor']).toBeDefined()
 
-    const coder = SOVEREIGN_PRESETS['sovereign-coder']
+    const coder = SOVEREIGN_PRESETS['sovereign-coder']!
     expect(coder.guardConfig.keepAlive?.enabled).toBe(true)
     expect(coder.guardConfig.stepFeedback?.enabled).toBe(true)
     expect(coder.guardConfig.toneGovernor?.enabled).toBe(true)
 
-    const zero = SOVEREIGN_PRESETS['zero-guardrail']
+    const zero = SOVEREIGN_PRESETS['zero-guardrail']!
     expect(zero.guardConfig.thermalModulator?.baseTemperature).toBe(0.1)
 
-    const refactor = SOVEREIGN_PRESETS['deep-refactor']
+    const refactor = SOVEREIGN_PRESETS['deep-refactor']!
     expect(refactor.guardConfig.thermalModulator?.baseTemperature).toBe(0.05)
     expect(refactor.guardConfig.reflexiveAuditor?.enabled).toBe(true)
   })

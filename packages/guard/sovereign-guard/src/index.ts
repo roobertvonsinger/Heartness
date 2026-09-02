@@ -31,6 +31,7 @@ import { registerHTCCalibrator } from './htc-calibrator.ts'
 import { registerBrainGraph } from './brain-graph.ts'
 import { registerOpenDesign } from './open-design.ts'
 import { registerAdaptivePivoter } from './adaptive-pivoter.ts'
+import { registerProgressStreamRelay } from './progress-stream-relay.ts'
 
 export const name = 'sovereign-guard'
 export const inject = ['systemPrompt']
@@ -92,6 +93,8 @@ export type {
   NodeCanvasGraph,
   OpenDesignConfig,
   AdaptivePivoterConfig,
+  ProgressStreamConfig,
+  ProgressFrame,
 } from './types.ts'
 
 export { RozRecycleEngine } from './roz-engine.ts'
@@ -180,6 +183,14 @@ export type {
   FailureRecord,
 } from './adaptive-pivoter.ts'
 export {
+  PillCoalescer,
+  pillToFrame,
+  createCompletionFrame,
+  createProgressRelaySession,
+  registerProgressStreamRelay,
+} from './progress-stream-relay.ts'
+export type { ProgressRelaySession } from './progress-stream-relay.ts'
+export {
   TransactionalBrainAdapter,
   calculateChecksum,
   SessionDeltaEngine,
@@ -218,4 +229,5 @@ export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
   registerBrainGraph(ctx, config.brainGraph ?? {})
   registerOpenDesign(ctx, config.openDesign ?? {})
   registerAdaptivePivoter(ctx, config.adaptivePivoter?.maxRetries ?? 2)
+  registerProgressStreamRelay(ctx, config.progressStream ?? {})
 }

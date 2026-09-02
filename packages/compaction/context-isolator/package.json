@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-sovereign-guard",
-  "description": "Sovereign Guard & Middleware Suite: Context Isolator, Tool Spill Guard, Autonomous Decision Interceptor and Roz Recycle Buffer",
+  "name": "@deepseek-ai/dsh-context-isolator",
+  "description": "Adaptive Context Isolator plugin for Cordis and DeepSeek Harness (DSH)",
   "version": "0.1.0-rc.8",
   "publishConfig": {
     "access": "public"
@@ -33,7 +33,7 @@
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
   "devDependencies": {
@@ -43,7 +43,6 @@
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   }
 }

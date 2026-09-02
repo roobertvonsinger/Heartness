@@ -179,7 +179,8 @@ export function registerAntigravityOptimizer(
 
   // Priority-based model selection
   ctx.on('agent/request', async (payload: any, next: any): Promise<LlmCallConfig> => {
-    const callConfig: LlmCallConfig = typeof next === 'function' ? await next() : payload?.config ?? {}
+    const rawConfig = typeof next === 'function' ? await next() : null
+    const callConfig: LlmCallConfig = rawConfig ?? payload?.config ?? {}
     const agent = payload?.agent
 
     let rawPrompt = ''

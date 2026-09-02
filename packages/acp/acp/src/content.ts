@@ -62,8 +62,8 @@ function decodeImage(block: Extract<AcpContentBlock, { type: 'image' }>): SaveIm
 /** Resolve the exact current route and require explicit image input support. */
 async function assertImageRoute(ctx: Context, agent: Agent, signal: AbortSignal): Promise<void> {
   const routed = agent.session.requestHeader()?.config
-  const provider = routed?.provider ?? agent.options.provider
-  const model = routed?.model ?? agent.options.model
+  const provider = routed?.provider ?? agent?.options?.provider
+  const model = routed?.model ?? agent?.options?.model
   const llm = ctx.get('llm')
   if (provider === undefined || model === undefined || llm === undefined) {
     throw new AcpContentError('the current model route could not be resolved for image input', 'invalid')

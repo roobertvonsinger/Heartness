@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-sovereign-guard",
-  "description": "Sovereign Guard & Middleware Suite: Context Isolator, Tool Spill Guard, Autonomous Decision Interceptor and Roz Recycle Buffer",
+  "name": "@deepseek-ai/dsh-rita-suite",
+  "description": "RITA Persona, Voice Gateway, Tone Governor and Conversational Identity Suite for DeepSick Hardness",
   "version": "0.1.0-rc.8",
   "publishConfig": {
     "access": "public"

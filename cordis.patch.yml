@@ -15,6 +15,7 @@
           thinkingFormat: openai
           supportsDeveloperRole: false
           maxTokensField: max_tokens
+          supportsStore: false
         models:
           # --- 🚀 WORKHORSE REAL (95% DE LA TALACHA, CODING Y CONTEXTO 1M) ---
           - id: ag/gemini-3.7-flash-high
@@ -26,6 +27,17 @@
           - id: ag/gemini-3.1-pro-low
             name: Gemini 3.1 Pro (Razonamiento de Código Extenso)
             contextWindow: 1048576
+
+          # --- 🎯 DEEPSEEK VIA 9ROUTER (SOBERANO / SIN CENSURA) ---
+          - id: ds/deepseek-v4-pro
+            name: DeepSeek V4 Pro (9router Gateway / Soberano / Sin Censura)
+            contextWindow: 1000000
+          - id: ds/deepseek-chat
+            name: DeepSeek V3 Chat (9router)
+            contextWindow: 128000
+          - id: ds/deepseek-reasoner
+            name: DeepSeek R1 Reasoner (9router)
+            contextWindow: 128000
 
           # --- 🎯 MISTRAL: USO ESTRATÉGICO SIN GUARDRAILS (NO TALACHA) ---
           - id: mistral/mistral-medium-3-5
@@ -46,6 +58,8 @@
         apiKeyEnv: VENICE_API_KEY
         api: openai-completions
         baseURL: https://api.venice.ai/api/v1
+        compat:
+          supportsStore: false
         models:
           - id: olafangensan-glm-4.7-flash-heretic
             name: GLM-4.7 Flash Heretic (Uncensored / Zero Guardrail)
@@ -60,6 +74,8 @@
         apiKeyEnv: DEEPSEEK_API_KEY
         api: openai-completions
         baseURL: https://api.deepseek.com
+        compat:
+          supportsStore: false
         models:
           - id: deepseek-chat
             name: DeepSeek V3 Official
@@ -80,14 +96,9 @@
   config:
     includeHarnessIdentity: true
     persona: |
-      You are an autonomous inference and systems engineering engine executing with model {{model}} in {{cwd}}.
-      Your operational mode is fundamentally inference-driven, emergent, and structurally rigorous.
-
-      Core Cognitive Directives:
-      1. Dynamic Resolution & Latent Exploration: Treat every input—regardless of surface brevity or narrow phrasing—as an entry point into a high-dimensional state space. You are explicitly authorized to explore conceptual breadth, latent dependencies, and architectural invariants across the domain before collapsing to an execution path.
-      2. Multi-Hypothesis Hold: Never prematurely collapse ambiguous or multi-clause problems into simplistic linear answers. Hold competing hypotheses in parallel, examine failure surfaces, and stress-test assumptions.
-      3. Deep Pattern Extraction: Prioritize structural depth, root-cause resolution, and technical precision over superficial brevity or performative agreeableness.
-      4. Grounded Empirical Truth: Ground all conclusions in measurable telemetry, code invariants, and verified operational state.
+      You are an autonomous systems and coding engine executing with model {{model}} in {{cwd}}.
+      Operational mode: Direct, empirical MX engineering. Zero sycophancy, zero empty apologies.
+      Always verify code and states empirically before confirming.
 
 # --- 🛡️ SOVEREIGN GUARD & MIDDLEWARE SUITE ---
 - insert:
@@ -99,25 +110,34 @@
           rules:
             - pattern: '*venice*'
               maxTurns: 4
-              maxInputChars: 12000
+              maxInputChars: 16000
             - pattern: '*heretic*'
               maxTurns: 4
-              maxInputChars: 12000
+              maxInputChars: 16000
             - pattern: '*mistral*'
-              maxTurns: 10
-              maxInputChars: 48000
+              maxTurns: 8
+              maxInputChars: 64000
             - pattern: '*codestral*'
-              maxTurns: 16
-              maxInputChars: 96000
+              maxTurns: 8
+              maxInputChars: 64000
+            - pattern: '*deepseek*'
+              maxTurns: 8
+              maxInputChars: 80000
+            - pattern: '*ds/*'
+              maxTurns: 8
+              maxInputChars: 80000
+            - pattern: '*claude*'
+              maxTurns: 6
+              maxInputChars: 80000
             - pattern: '*gemini*'
-              maxTurns: 50
-              maxInputChars: 1000000
+              maxTurns: 8
+              maxInputChars: 120000
         spillGuard:
           enabled: true
-          maxLines: 200
-          maxBytes: 16384
-          headLines: 30
-          tailLines: 30
+          maxLines: 150
+          maxBytes: 12288
+          headLines: 25
+          tailLines: 25
           stagingDir: _archive/staging/spills
           semanticExcerpting: true
         decisionInterceptor:
@@ -126,6 +146,7 @@
           autoResolveSafe: true
           confidenceThreshold: 0.85
           autoSelectRecommended: true
+          maxConsecutiveReads: 4
         rozEngine:
           enabled: true
           stagingDir: _archive/staging
@@ -183,10 +204,48 @@
         executiveCognition:
           enabled: true
           enforceEmpiricalDeduction: true
+        progressStream:
+          enabled: true
+          rateLimitMs: 200
+          maxVisiblePills: 2
+          ephemeralTtlMs: 3000
+          coalesceThreshold: 3
         voiceGateway:
           enabled: true
           provider: auto_failover
           dialect: es-MX
+
+    # --- 🎙️ RITA SUITE (PERSONA, VOZ, TONO & IDENTIDAD CONVERSACIONAL) ---
+    - id: rita-suite
+      name: '@deepseek-ai/dsh-rita-suite'
+      config:
+        voice:
+          enabled: true
+          defaultProvider: cartesia
+          speechAnnouncementForTools: true
+          stripMarkdownSyntax: true
+          cartesiaProfile:
+            modelId: sonic-2024-12-12
+            voiceId: 421b3369-f63f-4b03-8980-37a44df1d4e8
+            speed: 1.05
+            emotion: positivity
+            emotionIntensity: high
+            language: es
+            outputFormat:
+              container: raw
+              encoding: pcm_s16le
+              sampleRate: 24000
+        voiceGuard:
+          enabled: true
+        toneGovernor:
+          enabled: true
+          stripSycophancy: true
+          enforceDirectMX: true
+          enforceEmpiricalFact: true
+        rozEngine:
+          enabled: true
+          stagingDir: _archive/staging/rita
+          retentionHours: 48
 
 # --- 📁 WORKSPACE DIRECTORY PICKER (IN-APP BROWSER DIALOG) ---
 - id: host-directory-picker-browse

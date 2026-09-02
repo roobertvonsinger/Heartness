@@ -71,7 +71,8 @@ export function registerThermalModulator(ctx: Context, config: ThermalModulatorC
   const debugModeTemp = config.debugModeTemp ?? 0.05
 
   ctx.on('agent/request', async (payload: any, next: any): Promise<LlmCallConfig> => {
-    const callConfig: LlmCallConfig = typeof next === 'function' ? await next() : payload?.config ?? {}
+    const rawConfig = typeof next === 'function' ? await next() : null
+    const callConfig: LlmCallConfig = rawConfig ?? payload?.config ?? {}
     const agent = payload?.agent
 
     // Extract raw user prompt and inspect recent message history

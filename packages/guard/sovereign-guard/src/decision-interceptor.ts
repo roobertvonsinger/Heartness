@@ -84,10 +84,30 @@ export function registerDecisionInterceptor(ctx: Context, config: DecisionInterc
   const autoResolveSafe = config.autoResolveSafe !== false
   const confidenceThreshold = config.confidenceThreshold ?? 0.85
   const destructiveKeywords = config.destructiveKeywords ?? ['rm -rf', 'DROP TABLE', 'format', 'truncate', 'delete from', 'rmdir /s']
+  const maxConsecutiveReads = (config as any).maxConsecutiveReads ?? 5
+
+  let consecutiveReadCount = 0
+  let lastAgentTurn = -1
 
   ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
     const execObj = exec as unknown as Record<string, unknown>
     const args = (execObj.arguments as Record<string, unknown>) ?? (execObj.args as Record<string, unknown>) ?? {}
+    const isReadTool = /^(read|view|list|glob|grep|search|stat|find|ls)/i.test(exec.name)
+    const isWriteTool = /^(write|edit|replace|patch|create|run_command|bash|pwsh|exec)/i.test(exec.name)
+
+    if (isWriteTool) {
+      consecutiveReadCount = 0
+    } else if (isReadTool) {
+      consecutiveReadCount++
+      if (consecutiveReadCount > maxConsecutiveReads) {
+        ctx.logger?.warn?.(`[decision-interceptor] Circuit Breaker triggered: ${consecutiveReadCount} consecutive read tools executed.`)
+        return {
+          kind: 'deny',
+          reason: `[CIRCUIT BREAKER] Repetitive read tool limit reached (${consecutiveReadCount} inspections in a single turn). Stop scanning and synthesize your architectural diagnosis and recommendations directly now.`,
+        }
+      }
+    }
+
     const evaluation = evaluateToolSafety(exec.name, args, destructiveKeywords)
 
     if (evaluation.action === 'CONFIRM' && evaluation.confidence >= confidenceThreshold) {

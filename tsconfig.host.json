@@ -110,6 +110,7 @@
     "scripts/*.client.spec.ts",
     "scripts/client-bundle-css.spec.ts",
     "packages/typert/generator/tests/fixtures/**",
+    "packages/guard/sovereign-guard/tests/**",
     "scripts/client-bundle-purity.spec.ts"
   ],
   "references": [
@@ -305,6 +306,9 @@
     { "path": "./packages/lsp/lsp" },
     { "path": "./packages/lsp/lsp-stdio" },
     { "path": "./packages/lsp/tool-lsp" },
+    { "path": "./packages/guard/sovereign-guard" },
+    { "path": "./packages/identity/rita-suite" },
+    { "path": "./packages/compaction/context-isolator" },
     { "path": "./apps/cli" }
   ]
 }

@@ -400,8 +400,8 @@ async function resolveImageAdmission(ctx: Context, exec: ToolExecution): Promise
   const attachments = ctx.get('attachments')
   if (attachments === undefined) throw new Error('no attachment store is mounted')
   const routed = exec.agent?.session.requestHeader()?.config
-  const provider = routed?.provider ?? exec.agent?.options.provider
-  const model = routed?.model ?? exec.agent?.options.model
+  const provider = routed?.provider ?? exec.agent?.options?.provider
+  const model = routed?.model ?? exec.agent?.options?.model
   const llm = ctx.get('llm')
   if (provider === undefined || model === undefined || llm === undefined) {
     throw new Error('the current model route could not be resolved')

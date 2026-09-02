@@ -62,8 +62,8 @@ export function imageMediaTypeForPath(filePath: string): ImageMediaType | undefi
  */
 export async function assertImageCapableRoute(ctx: Context, exec: ToolExecution, requestedPath: string): Promise<void> {
   const routed = exec.agent?.session.requestHeader()?.config
-  const provider = routed?.provider ?? exec.agent?.options.provider
-  const model = routed?.model ?? exec.agent?.options.model
+  const provider = routed?.provider ?? exec.agent?.options?.provider
+  const model = routed?.model ?? exec.agent?.options?.model
   const llm = ctx.get('llm')
   if (provider === undefined || model === undefined || llm === undefined) {
     throw new Error(`cannot read "${requestedPath}" as an image: the current model route could not be resolved`)

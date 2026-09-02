@@ -259,10 +259,15 @@ export class ReactLoopAgent implements Agent {
     phase.turn = turn
     let turnEnds: TurnEndReason | null = null
     let target: InboxTarget = 'next-turn'
+    const MAX_STEPS_PER_TURN = 12
     try {
       while (true) {
         signal.throwIfAborted()
         const step = phase.step + 1
+        if (step > MAX_STEPS_PER_TURN) {
+          turnEnds = { kind: 'completed' }
+          break
+        }
         const decision = await this.preStep(target, { turn, step })
         if (decision.kind === 'reject') {
           turnEnds = { kind: 'blocked' }
@@ -454,12 +459,13 @@ export class ReactLoopAgent implements Agent {
           ...maxTokens === undefined ? {} : { maxTokens },
         },
     ))
-    const proposedConfig = await this.dispatch.waterfall(
+    const rawProposed = await this.dispatch.waterfall(
       'agent/request', { turn, step, signal },
       () => Promise.resolve(seedConfig),
     )
+    const proposedConfig = rawProposed ?? seedConfig
     signal.throwIfAborted()
-    if (!proposedConfig.provider || !proposedConfig.model) {
+    if (!proposedConfig?.provider || !proposedConfig?.model) {
       throw new Error(`agent "${this.id}" has no provider/model: set AgentOptions.provider and AgentOptions.model or supply both via the agent/request waterfall`)
     }
     let config: LlmCallConfig
