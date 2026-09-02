@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 
 /**
- * Heartness — Sovereign Native Launcher
+ * DSH — Sovereign Native Launcher
  *
  * 100% Frictionless Desktop Launcher:
  * - Single-Instance: focuses existing window instantly if already open.
@@ -217,7 +217,7 @@ fn launch_browser_on_desktop(browser: &Path, args: &str, cwd: &Path) -> bool {
 }
 
 fn focus_existing_window() -> bool {
-    let window_title = to_wide("Heartness");
+    let window_title = to_wide("DSH");
     let hwnd = unsafe { FindWindowW(std::ptr::null(), window_title.as_ptr()) };
     if hwnd != 0 {
         unsafe {
@@ -231,7 +231,7 @@ fn focus_existing_window() -> bool {
 }
 
 fn main() {
-    let mutex_name = to_wide("Global\\Heartness_Sovereign_Cockpit_Mutex");
+    let mutex_name = to_wide("Global\\DSH_Sovereign_Cockpit_Mutex");
     let mutex = unsafe { CreateMutexW(std::ptr::null_mut(), 0, mutex_name.as_ptr()) };
 
     if mutex != 0 && unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
@@ -298,10 +298,10 @@ fn main() {
     // 2. Launch browser window in PWA App Mode on physical monitor WinSta0\Default
     if let Some(browser) = find_browser() {
         let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| r"C:\Users\rober\AppData\Local".to_string());
-        let profile_dir = format!(r"{}\Heartness_Desktop_Profile", local_app_data);
+        let profile_dir = format!(r"{}\DSH_Desktop_Profile", local_app_data);
 
         let args = format!(
-            r#"--app=http://127.0.0.1:{} --window-size=1400,920 "--user-data-dir={}" --app-id=heartness-sovereign "--title=Heartness""#,
+            r#"--app=http://127.0.0.1:{} --window-size=1400,920 "--user-data-dir={}" --app-id=dsh-sovereign "--title=DSH""#,
             port,
             profile_dir
         );

@@ -1,6 +1,6 @@
-# Heartness 👑
+# DSH 👑
 
-> **Heartness** is a hardened, multi-provider sovereign fronting and agentic cockpit built on top of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [Cordis](https://github.com/cordiverse/cordis).
+> **DSH** is a hardened, multi-provider sovereign fronting and agentic cockpit built on top of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [Cordis](https://github.com/cordiverse/cordis).
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## Developer preview
 
-Heartness is currently in _developer preview_ and is iterating rapidly.
+DSH is currently in _developer preview_ and is iterating rapidly.
 
 ## Run
 
@@ -35,8 +35,8 @@ The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it
 To run from a repository checkout:
 
 ```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
+git clone https://github.com/roobertvonsinger/Heartness.git
+cd Heartness
 pnpm install
 pnpm run build
 pnpm dsh web
@@ -48,7 +48,7 @@ pnpm dsh web
 
 - Feel free to submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
 - Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/Ycq5dCaS4">Heartness Discord community</a>.
+- Join <a href="https://discord.gg/Ycq5dCaS4">DSH Discord community</a>.
 
 ## Contributing
 
