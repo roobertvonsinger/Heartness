@@ -8,6 +8,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { TotalCanvas } from './components/TotalCanvas'
 import { ProgressPill } from './components/ProgressPill'
+import { VoiceControl } from './components/VoiceControl'
 
 const el = document.getElementById('root')
 if (el === null) throw new Error('web app: missing #root')
@@ -31,4 +32,15 @@ pillContainer.style.zIndex = '9999'
 document.body.appendChild(pillContainer)
 createRoot(pillContainer).render(React.createElement(ProgressPill))
 
+// Sub-Plan C: Inyección de VoiceControl (HUD de Voz, PTT & Earcons)
+const voiceContainer = document.createElement('div')
+voiceContainer.id = 'voice-control-root'
+voiceContainer.style.position = 'fixed'
+voiceContainer.style.top = '0'
+voiceContainer.style.right = '0'
+voiceContainer.style.zIndex = '9999'
+document.body.appendChild(voiceContainer)
+createRoot(voiceContainer).render(React.createElement(VoiceControl))
+
 void new AppWebEntry(el).run()
+

@@ -15,3 +15,6 @@ export const HOST_EVENTS_PATH = `${API_PATH}/events.host`
 
 /** Browser canvas-events WebSocket pathname for progressive streaming pills. */
 export const CANVAS_EVENTS_PATH = `${API_PATH}/canvas/events`
+
+/** Browser voice duplex WebSocket pathname (AudioWorklet / Cartesia / Barge-in). */
+export const VOICE_WS_PATH = `${API_PATH}/voice/ws`

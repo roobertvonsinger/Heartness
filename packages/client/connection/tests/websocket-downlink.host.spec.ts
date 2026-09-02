@@ -7,7 +7,7 @@ import type {
   ApiProxy, HostFrame, MuxFrame, RpcRequest, ServerRequest,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
-import { CANVAS_EVENTS_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from '../src/api-path.ts'
+import { CANVAS_EVENTS_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH, VOICE_WS_PATH } from '../src/api-path.ts'
 import { WebSocketDownlinks } from '../src/websocket-downlink.ts'
 
 type MuxSource = (signal: AbortSignal) => AsyncIterable<RpcRequest<MuxFrame>>
@@ -52,6 +52,7 @@ async function serve(
     if (pathname === MUX_EVENTS_PATH) downlinks.handleMux(request, socket, head)
     else if (pathname === HOST_EVENTS_PATH) downlinks.handleHost(request, socket, head)
     else if (pathname === CANVAS_EVENTS_PATH && ctx) downlinks.handleCanvas(request, socket, head, ctx)
+    else if (pathname === VOICE_WS_PATH && ctx) downlinks.handleVoice(request, socket, head, ctx)
     else socket.destroy()
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -384,5 +385,103 @@ describe('WebSocket downlinks', () => {
       expect(disconnectedSessionId).toBe(connectedSessionId)
     })
   })
+
+  it('bridges voice frames bidirectionally and handles barge-in interrupt in <10ms', async () => {
+    let sessionEmitter: ((frame: unknown) => void) | undefined
+    let interruptedSessionId: string | undefined
+    let receivedAudioPayload: unknown
+    const fakeCtx = {
+      emit: (event: string, payload: unknown) => {
+        if (event === 'voice/session-connect') {
+          sessionEmitter = (payload as { emitter: (frame: unknown) => void }).emitter
+        } else if (event === 'voice/interrupt') {
+          interruptedSessionId = (payload as { sessionId: string }).sessionId
+        } else if (event === 'voice/audio-chunk') {
+          receivedAudioPayload = payload
+        }
+      },
+    }
+
+    const downlinks = new WebSocketDownlinks(api(idle, idle))
+    const host = await serve(downlinks, fakeCtx)
+    running.push(host.close)
+
+    const socket = new WebSocket(`${host.origin}${VOICE_WS_PATH}`)
+    await once(socket, 'open')
+
+    await vi.waitFor(() => {
+      expect(sessionEmitter).toBeDefined()
+    })
+
+    // 1. Test outbound audio chunk (Cartesia to browser)
+    const nextMessage = once(socket, 'message')
+    const speechChunk = {
+      type: 'speech_chunk',
+      audio: 'dGhpcyBpcyBhIHRlc3QgYXVkaW8=',
+      format: 'pcm',
+      durationMs: 320,
+    }
+    sessionEmitter!(speechChunk)
+
+    const [data] = await nextMessage
+    expect(JSON.parse(String(data))).toEqual(speechChunk)
+
+    // 2. Test inbound PTT audio chunk (browser to Cordis)
+    socket.send(JSON.stringify({
+      type: 'audio_chunk',
+      pcm: 'AQIDBAUG',
+    }))
+
+    await vi.waitFor(() => {
+      expect(receivedAudioPayload).toMatchObject({
+        type: 'audio_chunk',
+        pcm: 'AQIDBAUG',
+      })
+    })
+
+    // 3. Test barge-in interrupt (<10ms)
+    const startBargeIn = performance.now()
+    socket.send(JSON.stringify({ type: 'interrupt' }))
+
+    await vi.waitFor(() => {
+      expect(interruptedSessionId).toBeDefined()
+    }, { interval: 5, timeout: 500 })
+    const bargeInTime = performance.now() - startBargeIn
+    expect(bargeInTime).toBeLessThan(150)
+
+    socket.close()
+  })
+
+  it('notifies Cordis voice/session-disconnect when voice socket closes', async () => {
+    let disconnectedSessionId: string | undefined
+    let connectedSessionId: string | undefined
+    const fakeCtx = {
+      emit: (event: string, payload: unknown) => {
+        if (event === 'voice/session-connect') {
+          connectedSessionId = (payload as { sessionId: string }).sessionId
+        } else if (event === 'voice/session-disconnect') {
+          disconnectedSessionId = (payload as { sessionId: string }).sessionId
+        }
+      },
+    }
+
+    const downlinks = new WebSocketDownlinks(api(idle, idle))
+    const host = await serve(downlinks, fakeCtx)
+    running.push(host.close)
+
+    const socket = new WebSocket(`${host.origin}${VOICE_WS_PATH}`)
+    await once(socket, 'open')
+
+    await vi.waitFor(() => {
+      expect(connectedSessionId).toBeDefined()
+    })
+
+    socket.close()
+
+    await vi.waitFor(() => {
+      expect(disconnectedSessionId).toBe(connectedSessionId)
+    })
+  })
 })
+
 

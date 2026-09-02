@@ -120,6 +120,59 @@ export class WebSocketDownlinks {
   }
 
   /**
+   * Upgrade one socket for Voice events (Push-to-Talk, AudioWorklet VAD, Cartesia Streaming & Barge-in).
+   * Bridges duplex voice traffic between browser and Cordis context.
+   * @param req - HTTP upgrade request.
+   * @param socket - Raw socket transferred by the HTTP server.
+   * @param head - Bytes already read after the upgrade headers.
+   * @param ctx - Cordis Context dispatching events.
+   */
+  handleVoice(
+    req: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+    ctx: { emit: (event: string, payload: unknown) => void },
+  ): void {
+    this.server.handleUpgrade(req, socket, head, (websocket) => {
+      const sessionId = `voice-${randomUUID()}`
+      const emitter = (frame: unknown) => {
+        if (websocket.readyState === WebSocket.OPEN) {
+          websocket.send(typeof frame === 'string' ? frame : JSON.stringify(frame), () => {})
+        }
+      }
+
+      ctx.emit('voice/session-connect', { sessionId, emitter })
+
+      websocket.on('message', (raw) => {
+        try {
+          const str = String(raw)
+          const data = JSON.parse(str)
+          if (data.type === 'interrupt') {
+            ctx.emit('voice/interrupt', { sessionId })
+          } else if (data.type === 'audio_chunk') {
+            ctx.emit('voice/audio-chunk', { sessionId, ...data })
+          } else if (data.type === 'voice_toggle') {
+            ctx.emit('voice/toggle', { sessionId, enabled: data.enabled })
+          } else {
+            ctx.emit('voice/message', { sessionId, payload: data })
+          }
+        } catch {
+          // If binary or raw audio chunk, forward as audio buffer
+          ctx.emit('voice/raw-audio', { sessionId, data: raw })
+        }
+      })
+
+      websocket.once('close', () => {
+        ctx.emit('voice/session-disconnect', { sessionId })
+      })
+
+      websocket.once('error', () => {
+        ctx.emit('voice/session-disconnect', { sessionId })
+      })
+    })
+  }
+
+  /**
    * Terminate owned sockets and await the no-server acceptor plus frame pumps.
    * @returns A promise resolving after every socket and source iterator stops.
    */
