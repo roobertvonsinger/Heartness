@@ -85,7 +85,8 @@ export async function executeToolCalls(
     // Commit before classifying again so registry changes affect unstarted calls.
     // oxlint-disable-next-line typescript/no-non-null-assertion -- bounded by the loop condition
     const first = planned[next]!
-    const mode = ctx.tools.executionMode(first.exec).kind
+    const modeFn = ctx.tools.executionMode(first.exec)
+    const mode = modeFn ? modeFn.kind : 'exclusive'
     const group = mode === 'parallel' ? planned.slice(next) : [first]
     const outcome = await runGroup(
       ctx, turn, step, group, mode, signal, acceptContext,
@@ -168,6 +169,11 @@ async function runGroup(
     started++
     const prepared = await ctx.tools[TOOL_RUNTIME_SCHEDULER].prepare(call.exec)
     throwSchedulerFailure()
+    if (prepared === undefined) {
+      // Skip this call; it will be treated as aborted later
+      slots[index] = { exec: call.exec, result: { content: [{ type: 'text', text: 'Error: tool preparation returned undefined' }], isError: true, error: { message: 'tool preparation returned undefined' } }, needsPost: false }
+      return index
+    }
     switch (prepared.kind) {
       case 'dispatch': {
         const promise = ctx.tools[TOOL_RUNTIME_SCHEDULER].dispatch(prepared.exec).then(
@@ -201,7 +207,7 @@ async function runGroup(
       // oxlint-disable-next-line typescript/no-non-null-assertion -- bounded by the loop condition
       const nextCall = group[nextToStart]!
       if (nextToStart > 0 && mode === 'parallel'
-        && ctx.tools.executionMode(nextCall.exec).kind !== 'parallel') break
+        && ctx.tools.executionMode(nextCall.exec)?.kind !== 'parallel') break
       await startCall(nextToStart)
       nextToStart++
       throwSchedulerFailure()
