@@ -38,6 +38,66 @@ export const inject = ['systemPrompt']
 
 export const Config = SovereignGuardConfig
 
+import type {
+  ContextIsolatorConfig,
+  AdaptiveContextConfig,
+  SpillGuardConfig,
+  SpillMetadata,
+  DecisionInterceptorConfig,
+  RozEngineConfig,
+  FileVersionInfo,
+  ThermalModulatorConfig,
+  ReflexiveAuditorConfig,
+  AntigravityOptimizerConfig,
+  RoutingRule,
+  ResponseCacheConfig,
+  ParallelToolConfig,
+  HarnessTelemetryConfig,
+  AnomalyThresholds,
+  QualityAuditorConfig,
+  QualityMetrics,
+  QualityAuditResult,
+  KeepAliveGatewayConfig,
+  StepFeedbackConfig,
+  ToneGovernorConfig,
+  ContextSynthesizerConfig,
+  GraphifyCartographerConfig,
+  ProactiveIntentRadarConfig,
+  AttentionAnchorConfig,
+  ExecutiveCognitionConfig,
+  CartesiaVoiceProfile,
+  ElevenLabsVoiceProfile,
+  DualTrackVoiceConfig,
+  VoiceModifiers,
+  CartesiaStreamRequest,
+  ElevenLabsStreamRequest,
+  VoiceGuardConfig,
+  VoiceEconomyReport,
+  BrainBridgeConfig,
+  ReflexiveLearnerConfig,
+  SwarmOrchestratorConfig,
+  SwarmAgentProfile,
+  SwarmAgentRole,
+  SwarmExecutionMode,
+  SwarmTaskRequest,
+  SwarmAgentResponse,
+  SwarmTaskResult,
+  HTCCalibratorConfig,
+  BrainGraphConfig,
+  DesignTokenPalette,
+  DesignSystemSpec,
+  DesignAuditResult,
+  NodeCanvasItem,
+  NodeCanvasEdge,
+  NodeCanvasGraph,
+  OpenDesignConfig,
+  AdaptivePivoterConfig,
+  ProgressStreamConfig,
+  ProgressFrame,
+  BringToViewFrame,
+  CanvasEventFrame,
+} from './types.ts'
+
 export type {
   SovereignGuardConfig,
   ContextIsolatorConfig,
@@ -97,7 +157,7 @@ export type {
   ProgressFrame,
   BringToViewFrame,
   CanvasEventFrame,
-} from './types.ts'
+}
 
 export { RozRecycleEngine } from './roz-engine.ts'
 export { calculateSyntacticWeight } from './thermal-modulator.ts'
@@ -206,6 +266,172 @@ export type {
   SessionContinuityConfig,
 } from './session-continuity.ts'
 
+export interface GuardEntry {
+  name: string
+  tier: 'core' | 'peripheral'
+  configKey: keyof SovereignGuardConfig
+  register: (ctx: Context, cfg: unknown) => unknown
+}
+
+export const GUARD_REGISTRY: GuardEntry[] = [
+  // Nivel 1: Guards Core Innegociables
+  {
+    name: 'contextIsolator',
+    tier: 'core',
+    configKey: 'contextIsolator',
+    register: (ctx, cfg) => registerContextIsolator(ctx, (cfg as ContextIsolatorConfig) ?? {}),
+  },
+  {
+    name: 'spillGuard',
+    tier: 'core',
+    configKey: 'spillGuard',
+    register: (ctx, cfg) => registerSpillGuard(ctx, (cfg as SpillGuardConfig) ?? {}),
+  },
+  {
+    name: 'decisionInterceptor',
+    tier: 'core',
+    configKey: 'decisionInterceptor',
+    register: (ctx, cfg) => registerDecisionInterceptor(ctx, (cfg as DecisionInterceptorConfig) ?? {}),
+  },
+  {
+    name: 'rozEngine',
+    tier: 'core',
+    configKey: 'rozEngine',
+    register: (ctx, cfg) => registerRozEngine(ctx, (cfg as RozEngineConfig) ?? {}),
+  },
+
+  // Nivel 2: Módulos Periféricos & Experimentales (SafeBoot: Fallo aislado sin romper arranque)
+  {
+    name: 'thermalModulator',
+    tier: 'peripheral',
+    configKey: 'thermalModulator',
+    register: (ctx, cfg) => registerThermalModulator(ctx, (cfg as ThermalModulatorConfig) ?? {}),
+  },
+  {
+    name: 'reflexiveAuditor',
+    tier: 'peripheral',
+    configKey: 'reflexiveAuditor',
+    register: (ctx, cfg) => registerReflexiveAuditor(ctx, (cfg as ReflexiveAuditorConfig) ?? {}),
+  },
+  {
+    name: 'optimizer',
+    tier: 'peripheral',
+    configKey: 'optimizer',
+    register: (ctx, cfg) => registerAntigravityOptimizer(ctx, (cfg as AntigravityOptimizerConfig) ?? {}),
+  },
+  {
+    name: 'telemetry',
+    tier: 'peripheral',
+    configKey: 'telemetry',
+    register: (ctx, cfg) => registerHarnessTelemetry(ctx, (cfg as HarnessTelemetryConfig) ?? {}),
+  },
+  {
+    name: 'qualityAuditor',
+    tier: 'peripheral',
+    configKey: 'qualityAuditor',
+    register: (ctx, cfg) => registerQualityAuditor(ctx, (cfg as QualityAuditorConfig) ?? {}),
+  },
+  {
+    name: 'keepAlive',
+    tier: 'peripheral',
+    configKey: 'keepAlive',
+    register: (ctx, cfg) => registerKeepAliveGateway(ctx, (cfg as KeepAliveGatewayConfig) ?? {}),
+  },
+  {
+    name: 'stepFeedback',
+    tier: 'peripheral',
+    configKey: 'stepFeedback',
+    register: (ctx, cfg) => registerStepFeedback(ctx, (cfg as StepFeedbackConfig) ?? {}),
+  },
+  {
+    name: 'toneGovernor',
+    tier: 'peripheral',
+    configKey: 'toneGovernor',
+    register: (ctx, cfg) => registerToneGovernor(ctx, (cfg as ToneGovernorConfig) ?? {}),
+  },
+  {
+    name: 'synthesizer',
+    tier: 'peripheral',
+    configKey: 'synthesizer',
+    register: (ctx, cfg) => registerContextSynthesizer(ctx, (cfg as ContextSynthesizerConfig) ?? {}),
+  },
+  {
+    name: 'graphify',
+    tier: 'peripheral',
+    configKey: 'graphify',
+    register: (ctx, cfg) => registerGraphifyCartographer(ctx, (cfg as GraphifyCartographerConfig) ?? {}),
+  },
+  {
+    name: 'intentRadar',
+    tier: 'peripheral',
+    configKey: 'intentRadar',
+    register: (ctx, cfg) => registerIntentRadar(ctx, (cfg as ProactiveIntentRadarConfig) ?? {}),
+  },
+  {
+    name: 'attentionAnchor',
+    tier: 'peripheral',
+    configKey: 'attentionAnchor',
+    register: (ctx, cfg) => registerAttentionAnchor(ctx, (cfg as AttentionAnchorConfig) ?? {}),
+  },
+  {
+    name: 'executiveCognition',
+    tier: 'peripheral',
+    configKey: 'executiveCognition',
+    register: (ctx, cfg) => registerExecutiveCognition(ctx, (cfg as ExecutiveCognitionConfig) ?? {}),
+  },
+  {
+    name: 'voiceGateway',
+    tier: 'peripheral',
+    configKey: 'voiceGateway',
+    register: (ctx, cfg) => registerVoiceGateway(ctx, (cfg as DualTrackVoiceConfig) ?? {}),
+  },
+  {
+    name: 'voiceGuard',
+    tier: 'peripheral',
+    configKey: 'voiceGuard',
+    register: (ctx, cfg) => registerVoiceGuard(ctx, (cfg as VoiceGuardConfig) ?? {}),
+  },
+  {
+    name: 'reflexiveLearner',
+    tier: 'peripheral',
+    configKey: 'reflexiveLearner',
+    register: (ctx, cfg) => registerReflexiveLearner(ctx, (cfg as ReflexiveLearnerConfig) ?? {}),
+  },
+  {
+    name: 'htcCalibrator',
+    tier: 'peripheral',
+    configKey: 'htcCalibrator',
+    register: (ctx, cfg) => registerHTCCalibrator(ctx, (cfg as HTCCalibratorConfig) ?? {}),
+  },
+  {
+    name: 'brainGraph',
+    tier: 'peripheral',
+    configKey: 'brainGraph',
+    register: (ctx, cfg) => registerBrainGraph(ctx, (cfg as BrainGraphConfig) ?? {}),
+  },
+  {
+    name: 'openDesign',
+    tier: 'peripheral',
+    configKey: 'openDesign',
+    register: (ctx, cfg) => registerOpenDesign(ctx, (cfg as OpenDesignConfig) ?? {}),
+  },
+  {
+    name: 'adaptivePivoter',
+    tier: 'peripheral',
+    configKey: 'adaptivePivoter',
+    register: (ctx, cfg) => {
+      const p = cfg as AdaptivePivoterConfig | undefined
+      return registerAdaptivePivoter(ctx, p?.maxRetries ?? 2)
+    },
+  },
+  {
+    name: 'progressStream',
+    tier: 'peripheral',
+    configKey: 'progressStream',
+    register: (ctx, cfg) => registerProgressStreamRelay(ctx, (cfg as ProgressStreamConfig) ?? {}),
+  },
+]
+
 async function safeBoot(name: string, fn: () => Promise<unknown>, ctx?: Context): Promise<void> {
   try {
     await fn()
@@ -215,32 +441,15 @@ async function safeBoot(name: string, fn: () => Promise<unknown>, ctx?: Context)
 }
 
 export async function apply(ctx: Context, config: SovereignGuardConfig = {}): Promise<void> {
-  // Nivel 1: Guards Core Innegociables
-  registerContextIsolator(ctx, config.contextIsolator ?? {})
-  registerSpillGuard(ctx, config.spillGuard ?? {})
-  registerDecisionInterceptor(ctx, config.decisionInterceptor ?? {})
-  await registerRozEngine(ctx, config.rozEngine ?? {})
-
-  // Nivel 2: Módulos Periféricos & Experimentales (SafeBoot: Fallo aislado sin romper arranque)
-  await safeBoot('thermalModulator', () => Promise.resolve(registerThermalModulator(ctx, config.thermalModulator ?? {})), ctx)
-  await safeBoot('reflexiveAuditor', () => Promise.resolve(registerReflexiveAuditor(ctx, config.reflexiveAuditor ?? {})), ctx)
-  await safeBoot('optimizer', () => Promise.resolve(registerAntigravityOptimizer(ctx, config.optimizer ?? {})), ctx)
-  await safeBoot('telemetry', () => Promise.resolve(registerHarnessTelemetry(ctx, config.telemetry ?? {})), ctx)
-  await safeBoot('qualityAuditor', () => Promise.resolve(registerQualityAuditor(ctx, config.qualityAuditor ?? {})), ctx)
-  await safeBoot('keepAlive', () => Promise.resolve(registerKeepAliveGateway(ctx, config.keepAlive ?? {})), ctx)
-  await safeBoot('stepFeedback', () => Promise.resolve(registerStepFeedback(ctx, config.stepFeedback ?? {})), ctx)
-  await safeBoot('toneGovernor', () => Promise.resolve(registerToneGovernor(ctx, config.toneGovernor ?? {})), ctx)
-  await safeBoot('synthesizer', () => Promise.resolve(registerContextSynthesizer(ctx, config.synthesizer ?? {})), ctx)
-  await safeBoot('graphify', () => Promise.resolve(registerGraphifyCartographer(ctx, config.graphify ?? {})), ctx)
-  await safeBoot('intentRadar', () => Promise.resolve(registerIntentRadar(ctx, config.intentRadar ?? {})), ctx)
-  await safeBoot('attentionAnchor', () => Promise.resolve(registerAttentionAnchor(ctx, config.attentionAnchor ?? {})), ctx)
-  await safeBoot('executiveCognition', () => Promise.resolve(registerExecutiveCognition(ctx, config.executiveCognition ?? {})), ctx)
-  await safeBoot('voiceGateway', () => Promise.resolve(registerVoiceGateway(ctx, config.voiceGateway ?? {})), ctx)
-  await safeBoot('voiceGuard', () => Promise.resolve(registerVoiceGuard(ctx, config.voiceGuard ?? {})), ctx)
-  await safeBoot('reflexiveLearner', () => registerReflexiveLearner(ctx, config.reflexiveLearner ?? {}), ctx)
-  await safeBoot('htcCalibrator', () => Promise.resolve(registerHTCCalibrator(ctx, config.htcCalibrator ?? {})), ctx)
-  await safeBoot('brainGraph', () => registerBrainGraph(ctx, config.brainGraph ?? {}), ctx)
-  await safeBoot('openDesign', () => registerOpenDesign(ctx, config.openDesign ?? {}), ctx)
-  await safeBoot('adaptivePivoter', () => Promise.resolve(registerAdaptivePivoter(ctx, config.adaptivePivoter?.maxRetries ?? 2)), ctx)
-  await safeBoot('progressStream', () => Promise.resolve(registerProgressStreamRelay(ctx, config.progressStream ?? {})), ctx)
+  for (const g of GUARD_REGISTRY) {
+    const cfg = config[g.configKey] ?? {}
+    if (g.tier === 'core') {
+      const res = g.register(ctx, cfg)
+      if (res instanceof Promise) {
+        await res
+      }
+    } else {
+      await safeBoot(g.name, () => Promise.resolve(g.register(ctx, cfg)), ctx)
+    }
+  }
 }
