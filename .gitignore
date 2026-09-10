@@ -42,3 +42,11 @@ worktrees/
 _archive/
 data/
 artifacts/
+
+# Ecosistema agentico
+.agents/skills/_universal/
+.agents/workflows/_universal/
+
+# Python cache
+__pycache__/
+*.pyc
