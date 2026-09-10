@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -14,10 +14,10 @@ describe('ReflexiveLearner Suite', () => {
   let tempDbPath: string
   let learner: ReflexiveLearner
 
-  beforeEach(() => {
+  beforeAll(async () => {
     tempSkillsDir = path.join(os.tmpdir(), `test_skills_${Date.now()}_${Math.random().toString(36).slice(2)}`)
     tempDbPath = path.join(os.tmpdir(), `test_brain_${Date.now()}_${Math.random().toString(36).slice(2)}.db`)
-    learner = new ReflexiveLearner({
+    learner = await ReflexiveLearner.create({
       skillsDir: tempSkillsDir,
       brainDbPath: tempDbPath,
       minDeterministicScore: 0.85,
@@ -26,7 +26,7 @@ describe('ReflexiveLearner Suite', () => {
     })
   })
 
-  afterEach(() => {
+  afterAll(() => {
     learner.close()
     try {
       if (fs.existsSync(tempSkillsDir)) fs.rmSync(tempSkillsDir, { recursive: true, force: true })

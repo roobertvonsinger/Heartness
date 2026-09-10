@@ -6,7 +6,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { existsSync, rmSync } from 'node:fs'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import * as SovereignGuard from '../packages/guard/sovereign-guard/src/index.ts'
@@ -62,23 +62,23 @@ async function runBenchmark(): Promise<void> {
       const execPayload = { name: 'run_terminal', callId: `bench-${i}` }
       const rawResult = { content: [{ type: 'text' as const, text: lines }] }
 
-      const decision: any = await ctx.waterfall(
+      const decision = (await ctx.waterfall(
         'tools/post-execute',
-        execPayload as any,
-        rawResult as any,
-        () => Promise.resolve({ kind: 'accept', content: rawResult.content } as any),
-      )
+        execPayload as unknown,
+        rawResult as unknown,
+        () => Promise.resolve({ kind: 'accept', content: rawResult.content }),
+      )) as { kind: string; content: Array<{ type: string; text: string }> }
 
       const dt = performance.now() - t0
       latencies.push(dt)
-      if (decision.kind === 'accept' && decision.content[0].text.includes('SPILL GUARD')) {
+      if (decision.kind === 'accept' && decision.content[0]?.text.includes('SPILL GUARD')) {
         passed++
       }
     }
 
     latencies.sort((a, b) => a - b)
-    const p50 = latencies[Math.floor(latencies.length * 0.5)]!
-    const p95 = latencies[Math.floor(latencies.length * 0.95)]!
+    const p50 = latencies[Math.floor(latencies.length * 0.5)] ?? 0
+    const p95 = latencies[Math.floor(latencies.length * 0.95)] ?? 0
 
     results.push({
       scenario: 'High-Volume Tool Spill (50k Lines)',
@@ -132,19 +132,23 @@ async function runBenchmark(): Promise<void> {
 
     for (let i = 0; i < iterations; i++) {
       const t0 = performance.now()
-      const agent = { options: { model: 'venice/heretic-default' } } as any
-      const res: any = await ctx.waterfall('agent/pre-step', { agent, messages: history } as any, () => ({ kind: 'enter', messages: history }))
+      const agent = { options: { model: 'venice/heretic-default' } }
+      const res = (await ctx.waterfall(
+        'agent/pre-step',
+        { agent, messages: history } as unknown,
+        () => ({ kind: 'enter', messages: history }),
+      )) as { messages: Array<{ content: Array<{ text: string }> }> }
       const dt = performance.now() - t0
       latencies.push(dt)
 
-      if (res.messages.length <= 6 && res.messages[0].content[0].text.includes('ROOT TASK')) {
+      if (res.messages.length <= 6 && res.messages[0]?.content[0]?.text.includes('ROOT TASK')) {
         passed++
       }
     }
 
     latencies.sort((a, b) => a - b)
-    const p50 = latencies[Math.floor(latencies.length * 0.5)]!
-    const p95 = latencies[Math.floor(latencies.length * 0.95)]!
+    const p50 = latencies[Math.floor(latencies.length * 0.5)] ?? 0
+    const p95 = latencies[Math.floor(latencies.length * 0.95)] ?? 0
 
     results.push({
       scenario: 'Context Isolation (50 Turns -> 4k Model)',
@@ -181,7 +185,7 @@ async function runBenchmark(): Promise<void> {
     const iterations = 500
 
     for (let i = 0; i < iterations; i++) {
-      const sample = sampleOutputs[i % sampleOutputs.length]!
+      const sample = sampleOutputs[i % sampleOutputs.length] ?? ''
       const t0 = performance.now()
       const res = RitaSuite.sanitizeToneOutput(sample)
       const dt = performance.now() - t0
@@ -190,8 +194,8 @@ async function runBenchmark(): Promise<void> {
     }
 
     latencies.sort((a, b) => a - b)
-    const p50 = latencies[Math.floor(latencies.length * 0.5)]!
-    const p95 = latencies[Math.floor(latencies.length * 0.95)]!
+    const p50 = latencies[Math.floor(latencies.length * 0.5)] ?? 0
+    const p95 = latencies[Math.floor(latencies.length * 0.95)] ?? 0
 
     results.push({
       scenario: 'In-Flight Anti-Sycophancy & Tone Governance',

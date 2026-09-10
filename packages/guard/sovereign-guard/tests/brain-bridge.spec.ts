@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -8,12 +8,12 @@ describe('BrainBridge SQLite WAL Suite', () => {
   let tempDbPath: string
   let bridge: BrainBridge
 
-  beforeEach(() => {
+  beforeAll(async () => {
     tempDbPath = path.join(os.tmpdir(), `test_brain_${Date.now()}_${Math.random().toString(36).slice(2)}.db`)
-    bridge = new BrainBridge({ dbPath: tempDbPath, walMode: true })
+    bridge = await BrainBridge.create({ dbPath: tempDbPath, walMode: true })
   })
 
-  afterEach(() => {
+  afterAll(() => {
     bridge.close()
     try {
       if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath)

@@ -322,7 +322,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       },
       render: (_args, value) => [{
         type: 'text',
-        text: value.kind === 'background'
+        text: (value && typeof value === 'object' && 'kind' in value && value.kind === 'background')
           ? `started background job ${value.jobId}`
           : renderResult(value as { kind: 'foreground' } & ShellRunResult, escalationModes),
       }],

@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { animate } from 'animejs'
 import { VoiceEngine, type VoiceState } from '../audio/voice-engine.ts'
 
 export const VoiceControl: React.FC = () => {

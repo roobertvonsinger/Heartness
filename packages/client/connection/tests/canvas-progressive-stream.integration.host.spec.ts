@@ -7,6 +7,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { registerProgressStreamRelay } from '../../../guard/sovereign-guard/src/progress-stream-relay.ts'
 import { generateStepPill, registerStepFeedback, globalSteeringQueue } from '../../../guard/sovereign-guard/src/step-feedback.ts'
+import '../../../guard/sovereign-guard/src/types.ts'
 import type { ProgressFrame, BringToViewFrame } from '../../../guard/sovereign-guard/src/types.ts'
 import { CANVAS_EVENTS_PATH } from '../src/api-path.ts'
 import { WebSocketDownlinks } from '../src/websocket-downlink.ts'
@@ -18,12 +19,12 @@ afterEach(async () => {
 })
 
 function dummyApi(): ApiProxy {
-  return {
+  return ({
     events: {
       mux: async function* () {},
       host: async function* () {},
     },
-  } as ApiProxy
+  } as unknown) as ApiProxy
 }
 
 async function serveCanvas(
@@ -70,7 +71,7 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     // Emit a step-pill as would occur when agent decides to inspect a file
     const pill = generateStepPill('view_file', { AbsolutePath: 'apps/web/src/components/TotalCanvas.tsx' })
     const startTime = performance.now()
-    ctx.emit('progress/step-pill' as never, pill)
+    ctx.emit('progress/step-pill', pill)
 
     await vi.waitFor(() => {
       expect(receivedFrames.length).toBeGreaterThanOrEqual(1)
@@ -106,13 +107,13 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     })
 
     // Simulate tool start
-    ctx.emit('tool/before-execute' as never, { name: 'run_command', args: { CommandLine: 'pnpm test' } })
+    ctx.emit('tool/before-execute', { name: 'run_command', args: { CommandLine: 'pnpm test' } })
 
     // Simulate elapsed time > 100ms
     await new Promise(r => setTimeout(r, 120))
 
     // Simulate tool completion
-    ctx.emit('tool/after-execute' as never, { name: 'run_command' })
+    ctx.emit('tool/after-execute', { name: 'run_command' })
 
     await vi.waitFor(() => {
       const completion = receivedFrames.find(f => f.category === 'complete')
@@ -141,10 +142,10 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     })
 
     // Rapid burst of 4 pills
-    ctx.emit('progress/step-pill' as never, generateStepPill('view_file', { AbsolutePath: 'a.ts' }))
-    ctx.emit('progress/step-pill' as never, generateStepPill('view_file', { AbsolutePath: 'b.ts' }))
-    ctx.emit('progress/step-pill' as never, generateStepPill('view_file', { AbsolutePath: 'c.ts' }))
-    ctx.emit('progress/step-pill' as never, generateStepPill('view_file', { AbsolutePath: 'd.ts' }))
+    ctx.emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'a.ts' }))
+    ctx.emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'b.ts' }))
+    ctx.emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'c.ts' }))
+    ctx.emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'd.ts' }))
 
     await vi.waitFor(() => {
       // 1 initial + 1 coalesced summary (instead of 4 separate UI-thrashing updates)
@@ -177,7 +178,7 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     })
 
     const start = performance.now()
-    ctx.emit('canvas/bring-to-view' as never, {
+    ctx.emit('canvas/bring-to-view', {
       targetId: 'nodeB',
       label: 'Nodo B',
       scale: 1.35,
@@ -199,7 +200,7 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
 
   it('bridges upstream steer directives from canvas client to Cordis mid-turn steering', async () => {
     const ctx = new Context()
-    registerStepFeedback(ctx)
+    registerStepFeedback(ctx, {}, globalSteeringQueue)
 
     const downlinks = new WebSocketDownlinks(dummyApi())
     const host = await serveCanvas(downlinks, ctx)
@@ -209,7 +210,7 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     await once(ws, 'open')
 
     let steeredEvent: { directive?: string; text?: string; sessionId?: string } | undefined
-    ctx.on('user/mid-turn-input', (ev) => {
+    ctx.on('user/mid-turn-input', (ev: unknown) => {
       steeredEvent = ev as { directive?: string; text?: string; sessionId?: string }
     })
 

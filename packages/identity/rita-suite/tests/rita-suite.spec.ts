@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import * as RitaSuite from '../src/index.ts'
@@ -53,7 +53,7 @@ describe('RITA Persona & Voice Suite (@deepseek-ai/dsh-rita-suite)', () => {
 
   describe('2. Voice Quota & Frugality Guard', () => {
     it('skips trivial boilerplate speech to conserve quota', () => {
-      const guard = new RitaSuite.VoiceQuotaGuard({ enabled: true, skipTrivialSpeech: true as any })
+      const guard = new RitaSuite.VoiceQuotaGuard({ enabled: true, skipTrivialSpeech: true })
       const evalOk = guard.evaluateSpeechEconomy('ok')
       const evalListo = guard.evaluateSpeechEconomy('listo')
 

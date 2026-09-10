@@ -37,6 +37,7 @@ export interface VoiceModifiers {
   stability?: number | undefined
   similarityBoost?: number | undefined
   style?: number | undefined
+  useSpeakerBoost?: boolean | undefined
 }
 
 export interface CartesiaStreamRequest {
@@ -87,6 +88,7 @@ export interface VoiceGuardConfig {
   silenceThresholdMs?: number
   autoFallbackToElevenLabs?: boolean
   alertQuotaThresholdUsd?: number
+  skipTrivialSpeech?: boolean
 }
 
 export interface VoiceEconomyReport {
@@ -143,7 +145,7 @@ export const CartesiaVoiceProfileSchema: z<CartesiaVoiceProfile> = z.object({
     encoding: z.union(['pcm_s16le', 'pcm_f32le', 'pcm_mulaw'] as const).default('pcm_s16le'),
     sampleRate: z.number().default(24000),
   }).default({ container: 'raw', encoding: 'pcm_s16le', sampleRate: 24000 }),
-})
+}) as unknown as z<CartesiaVoiceProfile>
 
 export const ElevenLabsVoiceProfileSchema: z<ElevenLabsVoiceProfile> = z.object({
   modelId: z.string().default('eleven_multilingual_v2'),
@@ -155,7 +157,7 @@ export const ElevenLabsVoiceProfileSchema: z<ElevenLabsVoiceProfile> = z.object(
   speed: z.number().min(0.5).max(2.0).default(1.0),
   speechEngineId: z.string().default('eleven_turbo_v2_5'),
   latencyOptimization: z.number().min(0).max(4).default(3),
-})
+}) as unknown as z<ElevenLabsVoiceProfile>
 
 export const DualTrackVoiceConfigSchema: z<DualTrackVoiceConfig> = z.object({
   enabled: z.boolean().default(false),

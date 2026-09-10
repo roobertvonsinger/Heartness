@@ -203,7 +203,7 @@ accent: "#F59E0B"
 
     it('inyecta tokens de diseño en agent/pre-step cuando se detecta intención ui_design', async () => {
       const ctx = new Context()
-      registerOpenDesign(ctx, { defaultDesignSystem: 'sovereign_dark', autoInjectDesignTokens: true })
+      await registerOpenDesign(ctx, { defaultDesignSystem: 'sovereign_dark', autoInjectDesignTokens: true })
 
       const payload = {
         messages: [

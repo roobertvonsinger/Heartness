@@ -14,7 +14,7 @@ async function requestDSHAudit() {
   console.log('\x1b[1m\x1b[33m 🔍 SOLICITANDO AUDITORÍA TÉCNICA, SUGERENCIAS & HEADS-UP A DSH \x1b[0m')
   console.log('\x1b[35m========================================================================\x1b[0m\n')
 
-  const rita = loadSovereignAgent('rita')
+  const rita = await loadSovereignAgent('rita')
   const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY || ''
   const HERMES_URL = 'http://2.25.98.162:8642/v1/chat/completions'
   const HERMES_TOKEN = 'kvm4-hermes-super-2026'

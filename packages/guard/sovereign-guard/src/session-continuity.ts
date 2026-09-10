@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import { promises as fsPromises } from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { AttentionLedger } from './attention-anchor.ts'
@@ -64,7 +65,8 @@ export interface SessionContinuityConfig {
  * Calculates SHA-256 checksum for string payload
  */
 export function calculateChecksum(content: string): string {
-  return crypto.createHash('sha256').update(content, 'utf8').digest('hex')
+  const normalized = content.replace(/\r\n/g, '\n')
+  return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex')
 }
 
 /**
@@ -82,28 +84,63 @@ export function calculateDeltaChecksum(delta: SessionDelta): string {
  */
 export class TransactionalBrainAdapter {
   private db: DatabaseSync | null = null
-  private dbPath: string
+  private dbPath!: string
   private isInitialized = false
 
-  constructor(config: SessionContinuityConfig = {}) {
-    this.dbPath = config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db')
-    this.initDb(config.walMode !== false, config.busyTimeout ?? 5000)
+  private constructor() {}
+
+  /**
+   * Factory async que inicializa el directorio y la base de datos sin bloquear el event loop.
+   */
+  static async create(config: SessionContinuityConfig = {}): Promise<TransactionalBrainAdapter> {
+    const instance = new TransactionalBrainAdapter()
+    instance.dbPath = config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db')
+    await instance.initDb(config.walMode !== false, config.busyTimeout ?? 5000)
+    instance.isInitialized = true
+    return instance
   }
 
-  private initDb(wal: boolean, timeout: number): void {
+  /**
+   * @deprecated Use await TransactionalBrainAdapter.create() instead.
+   */
+  static createSync(config: SessionContinuityConfig = {}): TransactionalBrainAdapter {
+    const instance = new TransactionalBrainAdapter()
+    instance.dbPath = config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db')
+    instance.initDbSync(config.walMode !== false, config.busyTimeout ?? 5000)
+    instance.isInitialized = true
+    return instance
+  }
+
+  private initDbSync(wal: boolean, timeout: number): void {
     try {
       const dir = path.dirname(this.dbPath)
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true })
       }
+    } catch {}
+    this.db = new DatabaseSync(this.dbPath)
+    this.initWal(wal, timeout)
+  }
 
+  private initWal(wal: boolean, timeout: number): void {
+    if (wal) {
+      this.db?.exec('PRAGMA journal_mode = WAL;')
+      this.db?.exec('PRAGMA synchronous = NORMAL;')
+    }
+    this.db?.exec(`PRAGMA busy_timeout = ${Math.max(1000, timeout)};`)
+  }
+
+  private async initDb(wal: boolean, timeout: number): Promise<void> {
+    try {
+      const dir = path.dirname(this.dbPath)
+      await fsPromises.mkdir(dir, { recursive: true })
+    } catch {
+      // best effort — parent dir creation is non-fatal
+    }
+
+    try {
       this.db = new DatabaseSync(this.dbPath)
-
-      if (wal) {
-        this.db.exec('PRAGMA journal_mode = WAL;')
-        this.db.exec('PRAGMA synchronous = NORMAL;')
-      }
-      this.db.exec(`PRAGMA busy_timeout = ${Math.max(1000, timeout)};`)
+      this.initWal(wal, timeout)
 
       // Schema for session deltas
       this.db.exec(`
@@ -224,11 +261,17 @@ export class TransactionalBrainAdapter {
  * Engine for generating bounded, integrity-checked session deltas derived from factual repo telemetry
  */
 export class SessionDeltaEngine {
-  private adapter: TransactionalBrainAdapter
-  private config: Required<SessionContinuityConfig>
+  private adapter!: TransactionalBrainAdapter
+  private config!: Required<SessionContinuityConfig>
 
-  constructor(config: SessionContinuityConfig = {}) {
-    this.config = {
+  private constructor() {}
+
+  /**
+   * Factory async que inicializa el adapter SQLite sin bloquear el event loop.
+   */
+  static async create(config: SessionContinuityConfig = {}): Promise<SessionDeltaEngine> {
+    const instance = new SessionDeltaEngine()
+    instance.config = {
       dbPath: config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db'),
       walMode: config.walMode !== false,
       busyTimeout: config.busyTimeout ?? 5000,
@@ -236,7 +279,8 @@ export class SessionDeltaEngine {
       maxBlockers: config.maxBlockers ?? 3,
       maxActiveFiles: config.maxActiveFiles ?? 8,
     }
-    this.adapter = new TransactionalBrainAdapter(this.config)
+    instance.adapter = await TransactionalBrainAdapter.create(instance.config)
+    return instance
   }
 
   public extractGitTelemetry(cwd: string = process.cwd()): SessionGitTelemetry {
@@ -343,9 +387,9 @@ export class SessionDeltaEngine {
     testTelemetry?: SessionTestTelemetry | undefined
   }): SessionDelta {
     // Bounded slicing according to RITA audit recommendations
-    const boundedDecisions = (params.decisions || []).slice(-this.config.maxDecisions)
-    const boundedBlockers = (params.resolvedBlockers || []).slice(-this.config.maxBlockers)
-    const boundedFiles = (params.activeFiles || []).slice(-this.config.maxActiveFiles)
+    const boundedDecisions = (params.decisions || []).slice(-(this.config.maxDecisions ?? 10))
+    const boundedBlockers = (params.resolvedBlockers || []).slice(-(this.config.maxBlockers ?? 10))
+    const boundedFiles = (params.activeFiles || []).slice(-(this.config.maxActiveFiles ?? 10))
 
     const rawDelta: SessionDelta = {
       sessionId: params.sessionId || crypto.randomUUID(),
@@ -369,8 +413,11 @@ export class SessionDeltaEngine {
     return rawDelta
   }
 
-  public exportToNextSessionMarkdown(delta: SessionDelta, filePath?: string): string {
-    const targetPath = filePath || path.resolve(process.cwd(), 'NEXT-SESSION.md')
+  /**
+   * Renders NEXT-SESSION.md markdown content from a session delta.
+   * Pure function — no I/O, no event loop blocking.
+   */
+  public renderNextSessionMarkdown(delta: SessionDelta): string {
     const decisionsLines = delta.decisions.length > 0
       ? delta.decisions.map(d => `- **[${d.impact}] ${d.topic}:** ${d.decision}`).join('\n')
       : '- Sin cambios de arquitectura mayores en esta sesión.'
@@ -402,16 +449,16 @@ export class SessionDeltaEngine {
         testStatusLine = `🟢 ${delta.testTelemetry.passed}/${delta.testTelemetry.total} PASS (Smoke tests en ${durSec}s)`
       } else {
         testStatusLine = `🔴 ${delta.testTelemetry.failed} FALLADOS | ${delta.testTelemetry.passed}/${delta.testTelemetry.total} PASS (en ${durSec}s)`
-        testFailureBlock = `\n## 🔴 BLOQUEO / RIESGO ACTIVO (Tests Fallando)\n` +
+        testFailureBlock = '\n## 🔴 BLOQUEO / RIESGO ACTIVO (Tests Fallando)\n' +
           `> ⚠️ **Atención:** ${delta.testTelemetry.failed} tests fallaron en la última ejecución.\n` +
           (delta.testTelemetry.failureSummary ? `> **Detalle:** \`${delta.testTelemetry.failureSummary}\`\n\n` : '\n')
       }
     }
 
-    const repoTitle = delta.repository.toUpperCase()
-    const mdContent = `# NEXT-SESSION — ${repoTitle} × Continuidad Soberana\n\n` +
+    return `# NEXT-SESSION — ${delta.repository} × Continuidad Soberana\n\n` +
+      `<!-- NEXT-SESSION.md — ${delta.repository} × Continuidad Soberana -->\n` +
       `<!-- FACTUAL ARTIFACT DERIVED FROM REPO TELEMETRY (SHA-256: ${delta.checksum}) -->\n\n` +
-      `## 📊 Telemetría de Estado Verificable\n` +
+      '## 📊 Telemetría de Estado Verificable\n' +
       `- **Fecha:** ${delta.timestamp.split('T')[0]} (${delta.timestamp.split('T')[1]?.slice(0, 8)} UTC)\n` +
       `- **Agente Activo:** \`${delta.activeAgent}\`\n` +
       `- **Git Telemetría:** ${gitStatusLine}\n` +
@@ -436,14 +483,19 @@ export class SessionDeltaEngine {
       '# 2. Re-generar artefacto de continuidad verificado\n' +
       'pnpm run dsh:next\n' +
       '```\n'
+  }
 
+  /**
+   * Writes NEXT-SESSION.md artifact via async fs (non-blocking event loop).
+   */
+  public async writeNextSessionArtifactAsync(delta: SessionDelta, targetPath = path.resolve(process.cwd(), 'NEXT-SESSION.md')): Promise<string> {
+    const mdContent = this.renderNextSessionMarkdown(delta)
     try {
-      fs.writeFileSync(targetPath, mdContent, 'utf8')
+      await fsPromises.writeFile(targetPath, mdContent, 'utf8')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn(`[SessionDeltaEngine] Could not write NEXT-SESSION.md: ${msg}`)
+      console.warn(`[SessionDeltaEngine] Could not write NEXT-SESSION.md async: ${msg}`)
     }
-
     return mdContent
   }
 
@@ -461,13 +513,20 @@ export class SessionDeltaEngine {
  * Generates ultra-compact warm start context prompts (<250 tokens) for instant session resume.
  */
 export class WarmStartPrimer {
-  private deltaEngine: SessionDeltaEngine
+  private deltaEngine!: SessionDeltaEngine
 
-  constructor(config: SessionContinuityConfig = {}) {
-    this.deltaEngine = new SessionDeltaEngine(config)
+  private constructor() {}
+
+  /**
+   * Factory async que inicializa WarmStartPrimer con SessionDeltaEngine sin bloquear el event loop.
+   */
+  static async create(config: SessionContinuityConfig = {}): Promise<WarmStartPrimer> {
+    const instance = new WarmStartPrimer()
+    instance.deltaEngine = await SessionDeltaEngine.create(config)
+    return instance
   }
 
-  public assembleWarmStartPrompt(repository?: string): WarmStartPayload {
+  public async assembleWarmStartPrompt(repository?: string): Promise<WarmStartPayload> {
     const repo = repository || path.basename(process.cwd())
     const latestDelta = this.deltaEngine.getLatestDelta(repo)
 
@@ -484,22 +543,21 @@ export class WarmStartPrimer {
       }
     }
 
-    // Fallback to reading NEXT-SESSION.md from workspace root
+    // Fallback to reading NEXT-SESSION.md from workspace root (async)
     const nextSessionPath = path.resolve(process.cwd(), 'NEXT-SESSION.md')
-    if (fs.existsSync(nextSessionPath)) {
-      try {
-        const rawMd = fs.readFileSync(nextSessionPath, 'utf8')
-        const sliced = rawMd.slice(0, 750) // Bound strictly to ~180 tokens
-        const injection = `[CONTINUIDAD INTER-SESIÓN (NEXT-SESSION.md)]:\n${sliced}`
-        return {
-          promptInjection: injection,
-          estimatedTokens: Math.ceil(injection.length / 4),
-          sessionId: 'file-next-session',
-          source: 'NEXT_SESSION_MD',
-          integrityVerified: true,
-        }
-      } catch {}
-    }
+    try {
+      await fsPromises.access(nextSessionPath)
+      const rawMd = await fsPromises.readFile(nextSessionPath, 'utf8')
+      const sliced = rawMd.slice(0, 750) // Bound strictly to ~180 tokens
+      const injection = `[CONTINUIDAD INTER-SESIÓN (NEXT-SESSION.md)]:\n${sliced}`
+      return {
+        promptInjection: injection,
+        estimatedTokens: Math.ceil(injection.length / 4),
+        sessionId: 'file-next-session',
+        source: 'NEXT_SESSION_MD',
+        integrityVerified: true,
+      }
+    } catch {}
 
     return {
       promptInjection: '[CONTINUIDAD INTER-SESIÓN]: Sesión limpia iniciada. Sin deltas previos en memoria.',
@@ -508,6 +566,10 @@ export class WarmStartPrimer {
       source: 'FALLBACK_FRESH',
       integrityVerified: true,
     }
+  }
+
+  public async assembleWarmStartPromptAsync(repository?: string): Promise<WarmStartPayload> {
+    return this.assembleWarmStartPrompt(repository)
   }
 
   private formatDeltaForInjection(delta: SessionDelta): string {

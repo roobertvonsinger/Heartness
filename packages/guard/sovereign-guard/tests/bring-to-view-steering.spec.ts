@@ -11,11 +11,11 @@ import {
 } from '../src/voice-gateway.ts'
 import {
   registerProgressStreamRelay,
-  createProgressRelaySession,
 } from '../src/progress-stream-relay.ts'
 import {
   registerStepFeedback,
-  globalSteeringQueue,
+  getSteeringQueue,
+  clearSteeringQueue,
 } from '../src/step-feedback.ts'
 import type { BringToViewFrame, CanvasEventFrame } from '../src/types.ts'
 
@@ -130,7 +130,9 @@ describe('Sub-Plan D: Sinergia Visual-Voz ("Traer a la Vista") & In-Flight Steer
       registerStepFeedback(ctx, { enabled: true })
 
       const sessionId = 'session-steer-test'
-      globalSteeringQueue.clear(sessionId)
+      const queue = getSteeringQueue('default')
+      queue.clear(sessionId)
+      clearSteeringQueue(sessionId)
 
       // User interrupts in-flight with a steering directive
       ctx.emit('user/mid-turn-input', {
@@ -138,8 +140,8 @@ describe('Sub-Plan D: Sinergia Visual-Voz ("Traer a la Vista") & In-Flight Steer
         directive: 'Cancela esa búsqueda y revisa Nodo B inmediatamente',
       })
 
-      expect(globalSteeringQueue.hasPending(sessionId)).toBe(true)
-      expect(globalSteeringQueue.peekAll(sessionId)).toContain('Cancela esa búsqueda y revisa Nodo B inmediatamente')
+      expect(queue.hasPending(sessionId)).toBe(true)
+      expect(queue.peekAll(sessionId)).toContain('Cancela esa búsqueda y revisa Nodo B inmediatamente')
 
       // Next agent step arrives: directive must be injected into messages list
       const messages: Array<{ role: string; content: string; metadata?: Record<string, unknown> }> = [
@@ -153,7 +155,7 @@ describe('Sub-Plan D: Sinergia Visual-Voz ("Traer a la Vista") & In-Flight Steer
       })
 
       // Steering must be consumed from queue
-      expect(globalSteeringQueue.hasPending(sessionId)).toBe(false)
+      expect(queue.hasPending(sessionId)).toBe(false)
 
       // Message list now has injected steering directive
       expect(messages.length).toBe(3)

@@ -969,7 +969,6 @@ export class ToolRuntime extends Service {
         yield ctx.systemPrompt.section(this.sdkSection())
       }
     }.bind(this), 'tools.presentAs()')
-    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous composite teardown; direct return preserves disposer identity
     return dispose
   }
 
@@ -1472,14 +1471,19 @@ export class ToolRuntime extends Service {
     }
     try {
       const carrier = scopeTarget(this, exec.agent)
-      const gate = await this.ctx.waterfall(
+      const rawGate = await this.ctx.waterfall(
         carrier, 'tools/pre-execute', exec,
         () => Promise.resolve<PreToolDecision>({ kind: 'allow' }),
       )
+      const gate: PreToolDecision = (rawGate && typeof rawGate === 'object' && 'kind' in rawGate)
+        ? rawGate
+        : { kind: 'allow' }
       const askResolution: ToolAskResolution = gate.kind === 'ask'
         ? await this.serviceAsk(exec, gate)
         : { decision: gate, approvalCancelled: false }
-      const { decision } = askResolution
+      const decision: PreToolDecision = (askResolution.decision && typeof askResolution.decision === 'object' && 'kind' in askResolution.decision)
+        ? askResolution.decision
+        : { kind: 'allow' }
       if (this.callerCancelled(exec) && askResolution.approvalCancelled) {
         return await next({ kind: 'post-result', exec, result: toolAbortedBeforeDispatchResult() })
       }
@@ -1502,7 +1506,11 @@ export class ToolRuntime extends Service {
       }
       return await next({ kind: 'dispatch', exec })
     } catch (error: unknown) {
-      return next({ kind: 'final-result', exec, result: toolErrorResult(error) })
+      console.error('[TOOL-EXECUTION-FAIL]', error)
+      const errorMessage = error instanceof Error && error.stack
+        ? `${error.message}\nStack:\n${error.stack}`
+        : `Error: ${error}`
+      return next({ kind: 'final-result', exec, result: toolErrorResult(errorMessage) })
     }
   }
 
@@ -1869,11 +1877,14 @@ function createExecutionToken(): ToolExecutionToken {
 
 function toolErrorResult(error: unknown): ToolExecutionResult {
   const info = errorInfo(error)
-  const message = errorMessage(error)
+  const rawMsg = errorMessage(error)
+  const fullMessage = error instanceof Error && error.stack
+    ? `${rawMsg}\nStack:\n${error.stack}`
+    : `Error: ${rawMsg}`
   return {
-    content: [{ type: 'text', text: `Error: ${message}` }],
+    content: [{ type: 'text', text: fullMessage }],
     isError: true,
-    error: { message, ...info ? { info } : {} },
+    error: { message: fullMessage, ...info ? { info, stack: error instanceof Error ? error.stack : undefined } : {} },
   }
 }
 

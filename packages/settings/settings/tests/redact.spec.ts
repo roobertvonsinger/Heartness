@@ -101,6 +101,42 @@ describe('redactSecrets', () => {
     expect(redactSecrets({ type: 'object' } as never, { k: 'v' })).toEqual({ value: { k: 'v' }, secrets: [] })
     expect(redactSecrets({ type: 'array' } as never, ['v'])).toEqual({ value: ['v'], secrets: [] })
   })
+
+  it('redacts secrets reachable through union branches', () => {
+    const UnionSchema = z.union([
+      z.object({ secret: z.string().role('secret'), publicInfo: z.string() }),
+      z.object({ fallback: z.string() }),
+    ])
+    const { value, secrets } = redactSecrets(UnionSchema as z<never>, {
+      secret: 'token-123',
+      publicInfo: 'visible',
+    })
+    expect(value).toEqual({ publicInfo: 'visible' })
+    expect(secrets).toEqual([{ path: ['secret'], set: true }])
+  })
+
+  it('fails closed when an unhandled node declares a secret', () => {
+    const OpaqueWithSecret = {
+      type: 'custom_opaque',
+      meta: { role: 'secret' },
+    }
+    const { value, secrets } = redactSecrets(OpaqueWithSecret as never, 'hidden-value')
+    expect(value).toBeUndefined()
+    expect(secrets).toEqual([{ path: [], set: true }])
+  })
+
+  it('fails closed on nested secret inside unhandled opaque container', () => {
+    const OpaqueContainer = {
+      type: 'custom_container',
+      inner: {
+        type: 'string',
+        meta: { role: 'secret' },
+      },
+    }
+    const { value, secrets } = redactSecrets(OpaqueContainer as never, { inner: 'deep-secret' })
+    expect(value).toBeUndefined()
+    expect(secrets).toEqual([{ path: [], set: true }])
+  })
 })
 
 describe('describe() layers and redaction', () => {

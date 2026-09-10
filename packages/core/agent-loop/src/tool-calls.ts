@@ -170,9 +170,7 @@ async function runGroup(
     const prepared = await ctx.tools[TOOL_RUNTIME_SCHEDULER].prepare(call.exec)
     throwSchedulerFailure()
     if (prepared === undefined) {
-      // Skip this call; it will be treated as aborted later
-      slots[index] = { exec: call.exec, result: { content: [{ type: 'text', text: 'Error: tool preparation returned undefined' }], isError: true, error: { message: 'tool preparation returned undefined' } }, needsPost: false }
-      return index
+      return
     }
     switch (prepared.kind) {
       case 'dispatch': {

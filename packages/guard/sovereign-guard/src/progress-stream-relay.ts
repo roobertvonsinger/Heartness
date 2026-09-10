@@ -97,7 +97,17 @@ export class PillCoalescer {
     this.buffer = []
     this.lastEmitTime = Date.now()
 
-    if (pills.length === 1) return pills[0]!
+    const first = pills[0]
+    if (!first) {
+      return {
+        toolName: '_empty',
+        pill: '',
+        category: 'other',
+        timestamp: this.lastEmitTime,
+      }
+    }
+
+    if (pills.length === 1) return first
 
     // Group by category for smart summary
     const categories = new Map<string, number>()
@@ -128,7 +138,7 @@ export class PillCoalescer {
     return {
       toolName: '_coalesced',
       pill: summaryParts.join(' · '),
-      category: pills[0]!.category,
+      category: first.category,
       timestamp: Date.now(),
     }
   }
@@ -183,7 +193,7 @@ export function createCompletionFrame(
  */
 export function createProgressRelaySession(
   emitter: (frame: CanvasEventFrame) => void,
-  config: ProgressStreamConfig = {},
+  _config: ProgressStreamConfig = {},
 ): ProgressRelaySession {
   const history: CanvasEventFrame[] = []
   let active = true
@@ -229,7 +239,7 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
   const sessions = new Map<string, ProgressRelaySession>()
 
   // Bridge: listen for step pills from the event bus
-  ctx.on('progress/step-pill' as never, (pill: StepPill) => {
+  ctx.on('progress/step-pill', (pill: StepPill) => {
     const processed = coalescer.process(pill)
     if (!processed) return
 
@@ -243,11 +253,11 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
     }
 
     // Also emit on the bus for any other listeners (canvas events WS, etc.)
-    ctx.emit('progress/stream-frame' as never, frame)
+    ctx.emit('progress/stream-frame', frame)
   })
 
   // Track tool execution start times for duration measurement
-  ctx.on('tool/before-execute' as never, (event: unknown) => {
+  ctx.on('tool/before-execute', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown> }
     const toolName = ev.name || ev.tool || 'tool'
@@ -257,7 +267,7 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
   })
 
   // Emit completion frames with measured duration
-  ctx.on('tool/after-execute' as never, (event: unknown) => {
+  ctx.on('tool/after-execute', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; error?: unknown }
     const toolName = ev.name || ev.tool || 'tool'
@@ -285,7 +295,7 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
             session.send(frame)
           }
         }
-        ctx.emit('progress/stream-frame' as never, frame)
+        ctx.emit('progress/stream-frame', frame)
       }
     }
 
@@ -302,7 +312,7 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
   })
 
   // Listen for bring-to-view events to broadcast camera guidance frames to connected canvas clients
-  ctx.on('canvas/bring-to-view' as never, (event: unknown) => {
+  ctx.on('canvas/bring-to-view', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as Record<string, unknown>
     const frame: BringToViewFrame = {
@@ -322,16 +332,16 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
       }
     }
 
-    ctx.emit('progress/stream-frame' as never, frame)
+    ctx.emit('progress/stream-frame', frame)
   })
 
   // Expose session management on the context for WebSocket handlers
-  ctx.on('progress/session-connect' as never, (event: { sessionId: string; emitter: (frame: CanvasEventFrame) => void }) => {
+  ctx.on('progress/session-connect', (event: { sessionId: string; emitter: (frame: CanvasEventFrame) => void }) => {
     const session = createProgressRelaySession(event.emitter, config)
     sessions.set(event.sessionId, session)
   })
 
-  ctx.on('progress/session-disconnect' as never, (event: { sessionId: string }) => {
+  ctx.on('progress/session-disconnect', (event: { sessionId: string }) => {
     const session = sessions.get(event.sessionId)
     if (session) {
       session.stop()

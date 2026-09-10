@@ -19,13 +19,20 @@ export function calculateSyntacticWeight(text: string): { score: number; metrics
   }
 
   // 1. Logical and conditional operators (ternaries, logic operators, decision conjunctions, math logic)
-  const logicalMatches = text.match(/\b(if|else|unless|provided|given that|specifically when|while|switch|case|match|and|or|not|xor|forall|exists|det|rank|dim)\b|&&|\|\||\\land|\\lor|\\le|\\ge|\\neq|\\in|\\subset|\?|\:|\=\=\=|\=\=/gi) ?? []
+  const logicalRegex = new RegExp(
+    '\\b(if|else|unless|provided|given that|specifically when|while|switch|case|match|and|or|not|xor|forall|exists|det|rank|dim)\\b' +
+      '|&&|\\|\\||\\\\land|\\\\lor|\\\\le|\\\\ge|\\\\neq|\\\\in|\\\\subset|\\?|\\:|\\=\\=\\=|\\=\\=',
+    'gi',
+  )
+  const logicalMatches = text.match(logicalRegex) ?? []
   const logicalCount = logicalMatches.length
 
   // 2. Multi-clause constructs (semicolons, structured bullets, numbered steps, transitional phrases)
   const bulletMatches = text.match(/(?:^|\n)\s*[-*•\d]+[.)]/gm) ?? []
   const semicolonMatches = text.match(/;/g) ?? []
-  const transitionalMatches = text.match(/\b(therefore|furthermore|specifically|moreover|conversely|in contrast|in parallel|provided that|given that|specifically when)\b/gi) ?? []
+  const transitionalRegex =
+    /\b(therefore|furthermore|specifically|moreover|conversely|in contrast|in parallel|provided that|given that|specifically when)\b/gi
+  const transitionalMatches = text.match(transitionalRegex) ?? []
   const clauseCount = bulletMatches.length + semicolonMatches.length + transitionalMatches.length
 
   // 3. Parenthetical / Bracket nesting depth
@@ -57,6 +64,14 @@ export function calculateSyntacticWeight(text: string): { score: number; metrics
   }
 }
 
+interface AgentRequestPayload {
+  config?: LlmCallConfig
+  agent?: {
+    messages?: Array<{ role?: string; content?: unknown }>
+    session?: { messages?: Array<{ role?: string; content?: unknown }> }
+  }
+}
+
 /**
  * Registers dynamic thermal and sampling scaling based on prompt syntactic weight
  * and recent conversational feedback (e.g. deterministic debug temperature on error).
@@ -70,10 +85,11 @@ export function registerThermalModulator(ctx: Context, config: ThermalModulatorC
   const feedbackDriven = config.feedbackDriven !== false
   const debugModeTemp = config.debugModeTemp ?? 0.05
 
-  ctx.on('agent/request', async (payload: any, next: any): Promise<LlmCallConfig> => {
+  ctx.on('agent/request', async (payload: unknown, next?: () => Promise<LlmCallConfig>): Promise<LlmCallConfig> => {
     const rawConfig = typeof next === 'function' ? await next() : null
-    const callConfig: LlmCallConfig = rawConfig ?? payload?.config ?? {}
-    const agent = payload?.agent
+    const p = payload as AgentRequestPayload | undefined
+    const callConfig: LlmCallConfig = rawConfig ?? p?.config ?? {}
+    const agent = p?.agent
 
     // Extract raw user prompt and inspect recent message history
     let rawPrompt = ''

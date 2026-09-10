@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFile, access } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
@@ -307,27 +307,39 @@ export const BUILTIN_DESIGN_SYSTEMS: Record<string, DesignSystemSpec> = {
 // ==========================================
 
 /**
- * Resuelve un Design System buscando en memoria o en el sistema de archivos (`.agents/design-systems/<id>/DESIGN.md`).
+ * Resuelve un Design System desde memoria (builtins).
+ * Para cargar desde filesystem, use resolveDesignSystemAsync.
  */
-export function resolveDesignSystem(nameOrId: string = 'sovereign_dark', customDir?: string): DesignSystemSpec {
+export function resolveDesignSystem(nameOrId: string = 'sovereign_dark'): DesignSystemSpec {
+  const normalized = nameOrId.toLowerCase().replace(/[\s-]/g, '_')
+  if (BUILTIN_DESIGN_SYSTEMS[normalized]) {
+    return BUILTIN_DESIGN_SYSTEMS[normalized]
+  }
+  return SOVEREIGN_DARK
+}
+
+/**
+ * Resuelve un Design System de forma asíncrona sin bloquear el event loop.
+ * Busca en memoria primero, luego en el filesystem si customDir se especifica.
+ */
+export async function resolveDesignSystemAsync(nameOrId: string = 'sovereign_dark', customDir?: string): Promise<DesignSystemSpec> {
   const normalized = nameOrId.toLowerCase().replace(/[\s-]/g, '_')
 
   if (BUILTIN_DESIGN_SYSTEMS[normalized]) {
     return BUILTIN_DESIGN_SYSTEMS[normalized]
   }
 
-  // Intentar cargar desde filesystem si se especificó directorio
-  if (customDir && existsSync(customDir)) {
+  if (customDir) {
     const candidatePath = join(customDir, `${normalized}.md`)
     const dirCandidate = join(customDir, normalized, 'DESIGN.md')
 
-    const fileToRead = existsSync(candidatePath) ? candidatePath : existsSync(dirCandidate) ? dirCandidate : null
-    if (fileToRead) {
+    for (const candidate of [candidatePath, dirCandidate]) {
       try {
-        const content = readFileSync(fileToRead, 'utf-8')
+        await access(candidate)
+        const content = await readFile(candidate, 'utf-8')
         return parseDesignSystemMarkdown(content)
       } catch {
-        // Fallback a sovereign_dark
+        // File not accessible — try next candidate or fallback
       }
     }
   }
@@ -367,27 +379,27 @@ export function parseDesignSystemMarkdown(markdown: string): DesignSystemSpec {
     }
     if (trimmed.includes('primary:')) {
       const match = trimmed.match(/primary:\s*["']?([#a-zA-Z0-9(),.\s]+)["']?/)
-      if (match) spec.palette.primary = match[1].trim()
+      if (match && match[1]) spec.palette.primary = match[1].trim()
     }
     if (trimmed.includes('secondary:')) {
       const match = trimmed.match(/secondary:\s*["']?([#a-zA-Z0-9(),.\s]+)["']?/)
-      if (match) spec.palette.secondary = match[1].trim()
+      if (match && match[1]) spec.palette.secondary = match[1].trim()
     }
     if (trimmed.includes('background:') || trimmed.includes('bg:')) {
       const match = trimmed.match(/(?:background|bg):\s*["']?([#a-zA-Z0-9(),.\s]+)["']?/)
-      if (match) spec.palette.background = match[1].trim()
+      if (match && match[1]) spec.palette.background = match[1].trim()
     }
     if (trimmed.includes('surface:')) {
       const match = trimmed.match(/surface:\s*["']?([#a-zA-Z0-9(),.\s]+)["']?/)
-      if (match) spec.palette.surface = match[1].trim()
+      if (match && match[1]) spec.palette.surface = match[1].trim()
     }
     if (trimmed.includes('text:')) {
       const match = trimmed.match(/text:\s*["']?([#a-zA-Z0-9(),.\s]+)["']?/)
-      if (match) spec.palette.text = match[1].trim()
+      if (match && match[1]) spec.palette.text = match[1].trim()
     }
     if (trimmed.includes('accent:')) {
       const match = trimmed.match(/accent:\s*["']?([#a-zA-Z0-9(),.\s]+)["']?/)
-      if (match) spec.palette.accent = match[1].trim()
+      if (match && match[1]) spec.palette.accent = match[1].trim()
     }
     if (trimmed.startsWith('- P0:') || trimmed.startsWith('- P1:') || trimmed.startsWith('- P2:')) {
       spec.antiSlopDirectives.push(trimmed.substring(2))
@@ -1043,10 +1055,10 @@ interface AgentPostStepPayload {
 /**
  * Registra el subsistema OpenDesign en Cordis.
  */
-export function registerOpenDesign(ctx: Context, config: OpenDesignConfig = {}): void {
+export async function registerOpenDesign(ctx: Context, config: OpenDesignConfig = {}): Promise<void> {
   if (config.enabled === false) return
 
-  const defaultSpec = resolveDesignSystem(config.defaultDesignSystem ?? 'sovereign_dark', config.designSystemsDir)
+  const defaultSpec = await resolveDesignSystemAsync(config.defaultDesignSystem ?? 'sovereign_dark', config.designSystemsDir)
 
   ctx.on('agent/pre-step', (payload: unknown) => {
     const p = payload as AgentPreStepPayload | undefined

@@ -91,7 +91,7 @@ export function registerToneGovernor(ctx: Context, config: ToneGovernorConfig = 
   if (config.enabled === false) return
 
   // Register persona/tone directive if systemPrompt is present
-  const sysPrompt = (ctx as any).systemPrompt
+  const sysPrompt = ctx.get('systemPrompt') as { section?: (opts: { name: string; order: number; text: string }) => void } | undefined
   if (sysPrompt && typeof sysPrompt.section === 'function') {
     sysPrompt.section({
       name: 'sovereign-tone-governance',
@@ -101,7 +101,7 @@ export function registerToneGovernor(ctx: Context, config: ToneGovernorConfig = 
   }
 
   // Output response filter hook
-  ctx.on('agent/response' as any, (response: unknown) => {
+  ctx.on('agent/response', (response: unknown) => {
     if (response && typeof response === 'object' && 'text' in response) {
       const resp = response as { text: string }
       if (typeof resp.text === 'string') {

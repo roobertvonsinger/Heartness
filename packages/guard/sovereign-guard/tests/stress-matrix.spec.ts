@@ -7,13 +7,23 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import * as SovereignGuard from '../src/index.ts'
 import { RozRecycleEngine } from '../src/roz-engine.ts'
 
+interface PostExecuteResult {
+  kind: string
+  content: Array<{ type: string; text: string }>
+}
+
+interface DecisionResult {
+  kind: string
+  messages: Array<{ content: Array<{ type?: string; text?: string }> }>
+}
+
 describe('Sovereign Guard Controlled Stress Matrix', () => {
   // ── 1. Massive Log Spill Scenario ──────────────────────────────────────────
   describe('Scenario 1: Massive Log Spill & Overflow Boundary', () => {
     it('captures oversized 1,000-line output, persists to disk staging and renders bounded preview', async () => {
       const tempStaging = join(tmpdir(), 'stress-spills-' + Date.now())
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         spillGuard: {
           enabled: true,
           maxLines: 50,
@@ -34,15 +44,15 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       const execPayload = { name: 'run_terminal', callId: 'call-999' }
       const rawResult = { content: [{ type: 'text' as const, text: massiveLogOutput }] }
 
-      const decision: any = await ctx.waterfall(
+      const decision = (await ctx.waterfall(
         'tools/post-execute',
-        execPayload as any,
-        rawResult as any,
-        () => Promise.resolve({ kind: 'accept', content: rawResult.content } as any),
-      )
+        execPayload,
+        rawResult,
+        () => Promise.resolve({ kind: 'accept', content: rawResult.content }),
+      )) as PostExecuteResult
 
       expect(decision.kind).toBe('accept')
-      const resultText = (decision as any).content[0].text
+      const resultText = decision.content[0].text
 
       // Must be transformed
       expect(resultText).toContain('⚡ [SPILL GUARD: Output exceeded threshold')
@@ -67,7 +77,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
     it('bypasses read/fs_read tools to prevent infinite spill-read loops', async () => {
       const tempStaging = join(tmpdir(), 'stress-spills-loop-' + Date.now())
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         spillGuard: {
           enabled: true,
           maxLines: 10,
@@ -80,16 +90,16 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       const readExec = { name: 'read', callId: 'call-read-01' }
       const readResult = { content: [{ type: 'text' as const, text: largeContent }] }
 
-      const decision: any = await ctx.waterfall(
+      const decision = (await ctx.waterfall(
         'tools/post-execute',
-        readExec as any,
-        readResult as any,
-        () => Promise.resolve({ kind: 'accept', content: readResult.content } as any),
-      )
+        readExec,
+        readResult,
+        () => Promise.resolve({ kind: 'accept', content: readResult.content }),
+      )) as PostExecuteResult
 
       // Read tools should remain untransformed to avoid cyclic explosion
       expect(decision.kind).toBe('accept')
-      expect((decision as any).content[0].text).toBe(largeContent)
+      expect(decision.content[0].text).toBe(largeContent)
 
       rmSync(tempStaging, { recursive: true, force: true })
     })
@@ -99,7 +109,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
   describe('Scenario 2: Deep Recursive Trees & Context Pressure', () => {
     it('prunes deep directory trees under low-budget models while preserving root and leaf context', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         contextIsolator: {
           enabled: true,
           rules: [
@@ -125,20 +135,20 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
         )
       }
 
-      const agent = { options: { model: 'venice-uncensored-1-2' } } as any
-      const decision: any = await ctx.waterfall(
+      const agent = { options: { model: 'venice-uncensored-1-2' } }
+      const decision = (await ctx.waterfall(
         'agent/pre-step',
-        { agent, messages } as any,
+        { agent, messages },
         () => ({ kind: 'enter', messages }),
-      )
+      )) as DecisionResult
 
       expect(decision.kind).toBe('enter')
       if (decision.kind === 'enter') {
         // Must preserve first message (Root Objective)
-        const msg0 = decision.messages[0]?.content[0] as any
+        const msg0 = decision.messages[0]?.content[0]
         expect(msg0?.text || '').toContain('Root Objective')
         // Second message must be context isolator notice
-        const msg1 = decision.messages[1]?.content[0] as any
+        const msg1 = decision.messages[1]?.content[0]
         expect(msg1?.text || '').toContain('CONTEXT ISOLATOR')
         // Total messages bounded to initial + notice + maxTurns (3)
         expect(decision.messages.length).toBeLessThanOrEqual(5)
@@ -150,7 +160,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
   describe('Scenario 3: Mathematical & Multi-Clause Dense Syntax', () => {
     it('detects nested logical formulas and scales temperature dynamically to high exploration', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         thermalModulator: {
           enabled: true,
           baseTemperature: 0.2,
@@ -182,13 +192,13 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
             source: { kind: 'user' },
           }),
         ],
-      } as any
+      }
 
-      const config = await ctx.waterfall(
+      const config = (await ctx.waterfall(
         'agent/request',
         { agent, turn: 1, step: 0, signal: new AbortController().signal },
         () => Promise.resolve({ provider: '9router', model: 'ag/gemini-3.7-flash-high' }),
-      )
+      )) as { provider: string; model: string; temperature?: number }
 
       // Temperature must scale dynamically up towards maxTemperature
       expect(config.temperature).toBeGreaterThanOrEqual(0.70)
@@ -197,9 +207,10 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
 
   // ── 4. Critical File Mutation & Roz Engine ──────────────────────────────────
   describe('Scenario 4: Critical File Mutation & Roz Engine Safety Buffer', () => {
-    it('creates immutable timestamped backups before destructive changes and purges only expired', () => {
+    it('creates immutable timestamped backups before destructive changes and purges only expired', async () => {
       const tempStaging = join(tmpdir(), 'stress-roz-' + Date.now())
       const engine = new RozRecycleEngine(tempStaging, 48)
+      await engine.init()
 
       // Create dummy mission-critical files
       const file1 = join(tempStaging, 'core_pipeline.ts')
@@ -208,8 +219,8 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       writeFileSync(file2, 'CREATE TABLE audit_logs (id TEXT PRIMARY KEY);')
 
       // Backup before mutation
-      const b1 = engine.backupFile(file1)
-      const b2 = engine.backupFile(file2)
+      const b1 = await engine.backupFile(file1)
+      const b2 = await engine.backupFile(file2)
 
       expect(b1).toBeDefined()
       expect(b2).toBeDefined()
@@ -224,7 +235,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       expect(readFileSync(file1, 'utf-8')).toBe('// CORRUPTED STATE')
 
       // Clean check
-      expect(engine.purgeExpired()).toBe(0)
+      expect(await engine.purgeExpired()).toBe(0)
       rmSync(tempStaging, { recursive: true, force: true })
     })
   })
@@ -233,7 +244,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
   describe('Scenario 5: Mid-Session Hot Model Switching', () => {
     it('seamlessly transitions context boundaries across Gemini 1M -> Venice 32k -> Codestral 256k', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         contextIsolator: {
           enabled: true,
           rules: [
@@ -246,7 +257,7 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       })
 
       // Generate 20 turns of messages
-      const history: any[] = []
+      const history: Array<ReturnType<typeof createUserMessage>> = []
       for (let t = 1; t <= 20; t++) {
         history.push(createUserMessage({
           content: [{ type: 'text', text: `Dossier Item ${t}: Extensive telemetry analytics chunk` }],
@@ -255,44 +266,44 @@ describe('Sovereign Guard Controlled Stress Matrix', () => {
       }
 
       // 1. Initial run on Gemini 3.7 Flash High (1M window -> holds all 20 turns)
-      const geminiAgent = { options: { model: 'ag/gemini-3.7-flash-high' } } as any
-      const gDec: any = await ctx.waterfall(
+      const geminiAgent = { options: { model: 'ag/gemini-3.7-flash-high' } }
+      const gDec = (await ctx.waterfall(
         'agent/pre-step',
-        { agent: geminiAgent, messages: history } as any,
+        { agent: geminiAgent, messages: history },
         () => ({ kind: 'enter', messages: history }),
-      )
+      )) as DecisionResult
       expect(gDec.kind).toBe('enter')
       if (gDec.kind === 'enter') {
         expect(gDec.messages.length).toBe(20) // Full history retained
       }
 
       // 2. Abrupt mid-session switch to Venice Uncensored (strict 3 turns)
-      const veniceAgent = { options: { model: 'olafangensan-glm-4.7-flash-heretic' } } as any
-      const vDec: any = await ctx.waterfall(
+      const veniceAgent = { options: { model: 'olafangensan-glm-4.7-flash-heretic' } }
+      const vDec = (await ctx.waterfall(
         'agent/pre-step',
-        { agent: veniceAgent, messages: history } as any,
+        { agent: veniceAgent, messages: history },
         () => ({ kind: 'enter', messages: history }),
-      )
+      )) as DecisionResult
       expect(vDec.kind).toBe('enter')
       if (vDec.kind === 'enter') {
         // Root + Notice + 3 Tail turns = 5 items
         expect(vDec.messages.length).toBe(5)
-        const msg1 = vDec.messages[1]?.content[0] as any
+        const msg1 = vDec.messages[1]?.content[0]
         expect(msg1?.text || '').toContain('Omitted 16 older conversational turns')
       }
 
       // 3. Switch to Codestral (10 turns)
-      const codestralAgent = { options: { model: 'mistral/codestral-latest' } } as any
-      const cDec: any = await ctx.waterfall(
+      const codestralAgent = { options: { model: 'mistral/codestral-latest' } }
+      const cDec = (await ctx.waterfall(
         'agent/pre-step',
-        { agent: codestralAgent, messages: history } as any,
+        { agent: codestralAgent, messages: history },
         () => ({ kind: 'enter', messages: history }),
-      )
+      )) as DecisionResult
       expect(cDec.kind).toBe('enter')
       if (cDec.kind === 'enter') {
         // Root + Notice + 10 Tail turns = 12 items
         expect(cDec.messages.length).toBe(12)
-        const msg1 = cDec.messages[1]?.content[0] as any
+        const msg1 = cDec.messages[1]?.content[0]
         expect(msg1?.text || '').toContain('Omitted 9 older conversational turns')
       }
     })

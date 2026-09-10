@@ -24,7 +24,7 @@ function parseArgs(): {
   skipTests: boolean
   fullTests: boolean
   agent: string
-  outputPath?: string
+  outputPath?: string | undefined
 } {
   const args = process.argv.slice(2)
   let intent = 'Continuidad y Desarrollo Soberano de DSH (DeepSeek Harness / Heartness)'
@@ -70,7 +70,7 @@ function verifyRemote(): { verified: boolean; actualUrl: string } {
 
 async function main() {
   const { intent, nextAction, skipTests, fullTests, agent, outputPath } = parseArgs()
-  const engine = new SessionDeltaEngine()
+  const engine = await SessionDeltaEngine.create()
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log(' ⚡ GENERADOR DE CONTINUIDAD SOBERANA (NEXT-SESSION)')
@@ -123,7 +123,7 @@ async function main() {
   })
 
   const targetMd = outputPath || path.resolve(process.cwd(), 'NEXT-SESSION.md')
-  engine.exportToNextSessionMarkdown(delta, targetMd)
+  await engine.writeNextSessionArtifactAsync(delta, targetMd)
   engine.close()
 
   const remote = verifyRemote()
@@ -135,7 +135,7 @@ async function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('❌ Error generando artefacto NEXT-SESSION:', err)
   process.exit(1)
 })

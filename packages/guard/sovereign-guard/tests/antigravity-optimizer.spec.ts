@@ -29,7 +29,7 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
 
     it('dynamically rewrites agent model in Cordis agent/request pipeline', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         optimizer: {
           enabled: true,
           routingRules: rules,
@@ -40,7 +40,7 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
         messages: [
           createUserMessage({ content: [{ type: 'text', text: 'Implement a new refactor pipeline' }], source: { kind: 'user' } }),
         ],
-      } as any
+      }
 
       const config = await ctx.waterfall(
         'agent/request',

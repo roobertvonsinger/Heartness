@@ -117,7 +117,7 @@ async function runLiveAudit() {
   const t0Graph = performance.now()
   try {
     const testDbPath = path.resolve(process.cwd(), 'data', 'brain.db')
-    const graph = new BrainGraph({ dbPath: testDbPath, walMode: true, decayHalfLifeDays: 14, minPruneWeight: 0.15 })
+    const graph = await BrainGraph.create({ dbPath: testDbPath, walMode: true, decayHalfLifeDays: 14, minPruneWeight: 0.15 })
 
     // Registrar nodos
     graph.upsertNode({ id: 'domain:dsh_core', kind: 'DOMAIN', label: 'Core Architecture DSH' })
@@ -196,7 +196,7 @@ async function runLiveAudit() {
   // --------------------------------------------------------------------------------------
   const t0Voice = performance.now()
   try {
-    const rita = loadSovereignAgent('rita')
+    const rita = await loadSovereignAgent('rita')
 
     const rawMessage = `<voice emotion="positivity:high" speed="1.05">
 ¡Todo el sistema de DeepSick Hardness está sincronizado y corriendo al cien, Robert!

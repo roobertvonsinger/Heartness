@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import * as SovereignGuard from '../src/index.ts'
 import { TelemetryCollector } from '../src/harness-telemetry.ts'
 
 describe('Harness Telemetry & Monitoring Suite (Issue #16)', () => {

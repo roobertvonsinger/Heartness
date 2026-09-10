@@ -46,12 +46,17 @@ export class VoiceAudioCache {
     const entry = this.cache.get(key)
     if (entry) {
       entry.hitCount++
+      // LRU order refresh: re-insert so it becomes the most recently used
+      this.cache.delete(key)
+      this.cache.set(key, entry)
     }
     return entry
   }
 
   set(key: string, buffer: Buffer, format = 'mp3'): void {
-    if (this.cache.size >= this.maxEntries) {
+    if (this.cache.has(key)) {
+      this.cache.delete(key)
+    } else if (this.cache.size >= this.maxEntries) {
       const oldestKey = this.cache.keys().next().value
       if (oldestKey) this.cache.delete(oldestKey)
     }
@@ -80,10 +85,11 @@ export class VoiceAudioCache {
 export const globalAudioCache = new VoiceAudioCache(150)
 
 export class VoiceQuotaGuard {
-  private totalSessionChars = 0
+  private sessionChars = new Map<string, number>()
   private readonly config: VoiceGuardConfig
+  private readonly audioCache: VoiceAudioCache
 
-  constructor(config: VoiceGuardConfig = {}) {
+  constructor(config: VoiceGuardConfig = {}, audioCache: VoiceAudioCache = globalAudioCache) {
     this.config = {
       enabled: config.enabled ?? true,
       maxAudibleSecondsPerTurn: config.maxAudibleSecondsPerTurn ?? 45,
@@ -92,9 +98,10 @@ export class VoiceQuotaGuard {
       autoFallbackToElevenLabs: config.autoFallbackToElevenLabs ?? true,
       alertQuotaThresholdUsd: config.alertQuotaThresholdUsd ?? 5.0,
     }
+    this.audioCache = audioCache
   }
 
-  evaluateSpeechEconomy(rawText: string): VoiceEconomyEvaluation {
+  evaluateSpeechEconomy(rawText: string, sessionId = 'default'): VoiceEconomyEvaluation {
     if (this.config.enabled === false) {
       return {
         allowed: false,
@@ -156,10 +163,11 @@ export class VoiceQuotaGuard {
 
     const processedLength = processedText.length
     const savedChars = Math.max(0, originalLength - processedLength)
-    this.totalSessionChars += processedLength
+    const currentSessionTotal = (this.sessionChars.get(sessionId) ?? 0) + processedLength
+    this.sessionChars.set(sessionId, currentSessionTotal)
 
     const cacheKey = VoiceAudioCache.createKey(processedText)
-    const isCached = this.config.enableAudioCaching ? globalAudioCache.has(cacheKey) : false
+    const isCached = this.config.enableAudioCaching ? this.audioCache.has(cacheKey) : false
 
     return {
       allowed: true,
@@ -171,25 +179,42 @@ export class VoiceQuotaGuard {
     }
   }
 
-  getSessionStats() {
+  getSessionStats(sessionId = 'default') {
     return {
-      totalSessionChars: this.totalSessionChars,
-      cachedEntries: globalAudioCache.size(),
+      totalSessionChars: this.sessionChars.get(sessionId) ?? 0,
+      cachedEntries: this.audioCache.size(),
     }
   }
 
-  resetSession(): void {
-    this.totalSessionChars = 0
+  resetSession(sessionId?: string): void {
+    if (sessionId) {
+      this.sessionChars.delete(sessionId)
+    } else {
+      this.sessionChars.clear()
+    }
   }
 }
 
-export function registerVoiceGuard(ctx: Context, config: VoiceGuardConfig = {}): void {
-  const guard = new VoiceQuotaGuard(config)
+export function registerVoiceGuard(
+  ctx: Context,
+  config: VoiceGuardConfig = {},
+  audioCache: VoiceAudioCache = globalAudioCache,
+): void {
+  const guard = new VoiceQuotaGuard(config, audioCache)
 
-  ctx.on('agent/pre-response' as never, async (payload: { speechPayload?: { text?: string; disabled?: boolean; skipReason?: string; isCached?: boolean; savedChars?: number } }) => {
+  const emitter = ctx as unknown as {
+    on(event: 'agent/pre-response', listener: (payload: {
+      sessionId?: string
+      speechPayload?: { text?: string; disabled?: boolean; skipReason?: string | undefined; isCached?: boolean; savedChars?: number }
+    }) => Promise<void> | void): void
+    on(event: 'session/end', listener: (event: unknown) => void): void
+  }
+
+  emitter.on('agent/pre-response', async (payload) => {
     if (!payload?.speechPayload?.text) return
+    const sid = payload.sessionId || 'default'
 
-    const economy = guard.evaluateSpeechEconomy(payload.speechPayload.text)
+    const economy = guard.evaluateSpeechEconomy(payload.speechPayload.text, sid)
     if (!economy.allowed) {
       payload.speechPayload.disabled = true
       payload.speechPayload.skipReason = economy.skipReason
@@ -198,6 +223,13 @@ export function registerVoiceGuard(ctx: Context, config: VoiceGuardConfig = {}):
       payload.speechPayload.text = economy.processedText
       payload.speechPayload.isCached = economy.isCached
       payload.speechPayload.savedChars = economy.savedChars
+    }
+  })
+
+  emitter.on('session/end', (event: unknown) => {
+    const ev = event as { sessionId?: string } | undefined
+    if (ev?.sessionId) {
+      guard.resetSession(ev.sessionId)
     }
   })
 }

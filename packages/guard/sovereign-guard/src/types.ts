@@ -54,6 +54,8 @@ export interface DecisionInterceptorConfig {
   confidenceThreshold?: number
   autoSelectRecommended?: boolean
   destructiveKeywords?: string[]
+  /** Maximum consecutive read-only tool calls before circuit breaker triggers. Default: 5 */
+  maxConsecutiveReads?: number
 }
 
 export interface FileVersionInfo {
@@ -185,18 +187,18 @@ export interface ProgressFrame {
   category: 'read' | 'write' | 'exec' | 'search' | 'info' | 'error' | 'complete'
   toolName: string
   timestamp: number
-  durationMs?: number
+  durationMs?: number | undefined
   ephemeral: true
 }
 
 export interface BringToViewFrame {
   type: 'bring_to_view'
   targetId: string
-  label?: string
-  x?: number
-  y?: number
-  scale?: number
-  durationMs?: number
+  label?: string | undefined
+  x?: number | undefined
+  y?: number | undefined
+  scale?: number | undefined
+  durationMs?: number | undefined
   timestamp: number
 }
 
@@ -375,18 +377,18 @@ export interface NodeCanvasItem {
   id: string
   label: string
   type: 'agent' | 'tool' | 'service' | 'model' | 'database' | 'workflow_node'
-  status?: 'active' | 'idle' | 'executing' | 'error'
-  x?: number
-  y?: number
-  metadata?: Record<string, unknown>
+  status?: 'active' | 'idle' | 'executing' | 'error' | undefined
+  x?: number | undefined
+  y?: number | undefined
+  metadata?: Record<string, unknown> | undefined
 }
 
 export interface NodeCanvasEdge {
   from: string
   to: string
-  label?: string
-  style?: 'solid' | 'dashed' | 'pulse'
-  animated?: boolean
+  label?: string | undefined
+  style?: 'solid' | 'dashed' | 'pulse' | undefined
+  animated?: boolean | undefined
 }
 
 export interface NodeCanvasGraph {
@@ -537,7 +539,19 @@ export interface SovereignGuardConfig {
   voiceGateway?: DualTrackVoiceConfig
   adaptivePivoter?: AdaptivePivoterConfig
   progressStream?: ProgressStreamConfig
+  brainBridge?: BrainBridgeConfig
+  reflexiveLearner?: ReflexiveLearnerConfig
+  swarmOrchestrator?: SwarmOrchestratorConfig
+  htcCalibrator?: HTCCalibratorConfig
+  brainGraph?: BrainGraphConfig
+  openDesign?: OpenDesignConfig
 }
+
+export type {
+  SwarmTaskRequest,
+  SwarmAgentResponse,
+  SwarmTaskResult,
+} from './swarm-orchestrator.ts'
 
 export const ModelRule: z<ModelRule> = z.object({
   pattern: z.string(),
@@ -585,6 +599,7 @@ export const DecisionInterceptorConfig: z<DecisionInterceptorConfig> = z.object(
   confidenceThreshold: z.number().default(0.85),
   autoSelectRecommended: z.boolean().default(true),
   destructiveKeywords: z.array(z.string()).default(['rm -rf', 'DROP TABLE', 'format', 'truncate', 'delete from', 'rmdir /s']),
+  maxConsecutiveReads: z.number().default(5),
 })
 
 export const RozEngineConfig: z<RozEngineConfig> = z.object({
@@ -766,7 +781,7 @@ export const CartesiaVoiceProfile: z<CartesiaVoiceProfile> = z.object({
     encoding: z.string(),
     sampleRate: z.number(),
   }),
-})
+}) as unknown as z<CartesiaVoiceProfile>
 
 export const ElevenLabsVoiceProfile: z<ElevenLabsVoiceProfile> = z.object({
   modelId: z.string().default('eleven_turbo_v2_5'),
@@ -778,7 +793,7 @@ export const ElevenLabsVoiceProfile: z<ElevenLabsVoiceProfile> = z.object({
   speed: z.number().default(1.0),
   speechEngineId: z.string().default('seng_sovereign_dsh'),
   latencyOptimization: z.number(),
-})
+}) as unknown as z<ElevenLabsVoiceProfile>
 
 export const VoiceGuardConfig: z<VoiceGuardConfig> = z.object({
   enabled: z.boolean().default(true),
@@ -787,7 +802,7 @@ export const VoiceGuardConfig: z<VoiceGuardConfig> = z.object({
   enableAudioCache: z.boolean().default(true),
   skipTrivialSpeech: z.boolean().default(true),
   enforceAdvisoryConciseness: z.boolean().default(true),
-})
+}) as unknown as z<VoiceGuardConfig>
 
 export const DualTrackVoiceConfig: z<DualTrackVoiceConfig> = z.object({
   enabled: z.boolean().default(true),
@@ -799,7 +814,7 @@ export const DualTrackVoiceConfig: z<DualTrackVoiceConfig> = z.object({
   maxSpeechChars: z.number().default(400),
   voiceTagDelimiters: z.array(z.string()).default(['<voice>', '</voice>']),
   dialect: z.string().default('es-MX'),
-})
+}) as unknown as z<DualTrackVoiceConfig>
 
 export const BrainBridgeConfig: z<BrainBridgeConfig> = z.object({
   dbPath: z.string().default('data/brain.db'),
@@ -848,9 +863,9 @@ export const OpenDesignConfig: z<OpenDesignConfig> = z.object({
   enforceAntiSlop: z.boolean().default(true),
   minAuditScore: z.number().default(0.85),
   autoInjectDesignTokens: z.boolean().default(true),
-  exportFormats: z.array(z.string()).default(['html', 'svg', 'json', 'slide_deck']),
+  exportFormats: z.array(z.union(['html', 'svg', 'json', 'slide_deck'] as const)).default(['html', 'svg', 'json', 'slide_deck']),
   previewPort: z.number().default(4200),
-})
+}) as unknown as z<OpenDesignConfig>
 
 export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   contextIsolator: ContextIsolatorConfig.default({}),
@@ -880,4 +895,70 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   openDesign: OpenDesignConfig.default({}),
   adaptivePivoter: AdaptivePivoterConfig.default({}),
   progressStream: ProgressStreamConfig.default({}),
-})
+}) as unknown as z<SovereignGuardConfig>
+
+interface VoiceInterruptEvent {
+  sessionId?: string | undefined
+  timestamp: number
+}
+
+interface VoiceSpeechReadyEvent {
+  speechPayload?: Record<string, unknown> | undefined
+}
+
+interface CanvasBringToViewEvent {
+  targetId: string
+  label?: string | undefined
+  timestamp?: number | undefined
+}
+
+interface SessionEndEvent {
+  sessionId?: string | undefined
+}
+
+interface StepPill {
+  toolName: string
+  pill: string
+  category: string
+  timestamp: number
+}
+
+interface SessionConnectEvent {
+  sessionId?: string | undefined
+}
+
+interface SessionDisconnectEvent {
+  sessionId?: string | undefined
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'ready'(): void | Promise<void>
+    'dispose'(): void | Promise<void>
+    'agent/pre-step'(payload: unknown, next?: () => Promise<unknown> | unknown): unknown
+    'agent/post-step'(payload: unknown): void | Promise<void>
+    'agent/request'(payload: unknown, next: () => Promise<unknown> | unknown): unknown
+    'agent/response'(response: unknown): void | Promise<void>
+    'agent/pre-response'(payload: unknown): void | Promise<void>
+    'agent/tool-error'(payload: unknown): void | Promise<void>
+    'agent/tool-success'(payload: unknown): void | Promise<void>
+    'tools/pre-execute'(exec: unknown, next?: () => Promise<unknown> | unknown): unknown
+    'tools/post-execute'(exec: unknown, result: unknown, next?: () => Promise<unknown> | unknown): void
+    'tool/before-execute'(event: unknown): void | Promise<void>
+    'tool/after-execute'(event: unknown): void | Promise<void>
+    'tool/after-call'(payload: unknown): void | Promise<void>
+    'tool/result'(payload: unknown): void | Promise<void>
+    'user/mid-turn-input'(event: unknown): void | Promise<void>
+    'session/end'(event?: SessionEndEvent): void | Promise<void>
+    'progress/step-pill'(pill: StepPill): void | Promise<void>
+    'progress/session-connect'(event: SessionConnectEvent): void | Promise<void>
+    'progress/session-disconnect'(event: SessionDisconnectEvent): void | Promise<void>
+    'canvas/bring-to-view'(event: CanvasBringToViewEvent): void | Promise<void>
+    'voice/interrupt'(event: VoiceInterruptEvent): void | Promise<void>
+    'voice/speech-ready'(event: VoiceSpeechReadyEvent): void | Promise<void>
+    'steering/queued'(event: { sessionId: string; directive: string }): void | Promise<void>
+    'steering/injected'(event: { sessionId: string; injection: string }): void | Promise<void>
+    'step-feedback/pill'(pill: StepPill): void | Promise<void>
+    'progress/stream-frame'(frame: CanvasEventFrame): void | Promise<void>
+  }
+}

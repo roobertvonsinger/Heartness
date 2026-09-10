@@ -38,7 +38,7 @@ export interface AnomalyReport {
   type: 'SLOW_RESPONSE' | 'HIGH_FAILURE_RATE' | 'HIGH_TOKEN_USAGE'
   severity: 'WARNING' | 'CRITICAL'
   message: string
-  details: Record<string, any>
+  details: Record<string, unknown>
   timestamp: number
 }
 
@@ -213,24 +213,30 @@ export function registerHarnessTelemetry(
   const collector = new TelemetryCollector()
 
   // Track tool execution times
-  const activeToolTimers = new Map<any, number>()
+  const activeToolTimers = new Map<object, number>()
 
-  ctx.on('tools/pre-execute' as any, async (exec: any, next: any) => {
-    activeToolTimers.set(exec, Date.now())
+  ctx.on('tools/pre-execute', async (exec: unknown, next?: () => Promise<unknown>) => {
+    if (exec && typeof exec === 'object') {
+      activeToolTimers.set(exec, Date.now())
+    }
     return typeof next === 'function' ? next() : { kind: 'allow' }
   })
 
-  ctx.on('tools/post-execute' as any, async (exec: any, result: any, next: any) => {
-    const startTime = activeToolTimers.get(exec)
-    if (startTime) {
-      activeToolTimers.delete(exec)
-      const durationMs = Date.now() - startTime
-      const isError = result?.kind === 'block' || result?.isError
-      collector.recordToolExecution({
-        toolName: exec?.name ?? 'unknown',
-        durationMs,
-        success: !isError,
-      })
+  ctx.on('tools/post-execute', async (exec: unknown, result: unknown, next?: () => Promise<unknown>) => {
+    if (exec && typeof exec === 'object') {
+      const startTime = activeToolTimers.get(exec)
+      if (startTime) {
+        activeToolTimers.delete(exec)
+        const durationMs = Date.now() - startTime
+        const res = result as { kind?: string; isError?: boolean } | undefined
+        const isError = res?.kind === 'block' || res?.isError
+        const execObj = exec as { name?: string }
+        collector.recordToolExecution({
+          toolName: execObj?.name ?? 'unknown',
+          durationMs,
+          success: !isError,
+        })
+      }
     }
     return typeof next === 'function' ? next() : result
   })

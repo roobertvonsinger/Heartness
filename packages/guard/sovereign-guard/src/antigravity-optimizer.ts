@@ -3,14 +3,14 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 import type { AntigravityOptimizerConfig, RoutingRule } from './types.ts'
 
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   key: string
   value: T
   timestamp: number
   hits: number
 }
 
-export class ResponseCache<T = any> {
+export class ResponseCache<T = unknown> {
   private cache = new Map<string, CacheEntry<T>>()
   private ttlMs: number
   private maxEntries: number
@@ -120,7 +120,7 @@ export async function executeToolsInParallel<T, R>(
 
   async function executeWithRetry(item: T, index: number): Promise<R> {
     let attempt = 0
-    let lastError: any
+    let lastError: unknown
 
     while (attempt < maxRetries) {
       attempt++
@@ -162,10 +162,18 @@ export async function executeToolsInParallel<T, R>(
   return results
 }
 
+interface OptimizerRequestPayload {
+  config?: LlmCallConfig
+  agent?: {
+    messages?: Array<{ source?: { kind?: string }; role?: string; content?: Array<{ type?: string; text?: string }> }>
+    session?: { messages?: Array<{ source?: { kind?: string }; role?: string; content?: Array<{ type?: string; text?: string }> }> }
+  }
+}
+
 export function registerAntigravityOptimizer(
   ctx: Context,
   config: AntigravityOptimizerConfig = {},
-): { cache: ResponseCache; getStats: () => any } | undefined {
+): { cache: ResponseCache; getStats: () => Record<string, unknown> } | undefined {
   if (config.enabled === false) return undefined
 
   const cacheConfig = config.cache ?? {}
@@ -178,10 +186,11 @@ export function registerAntigravityOptimizer(
   ]
 
   // Priority-based model selection
-  ctx.on('agent/request', async (payload: any, next: any): Promise<LlmCallConfig> => {
+  ctx.on('agent/request', async (payload: unknown, next?: () => Promise<LlmCallConfig>): Promise<LlmCallConfig> => {
     const rawConfig = typeof next === 'function' ? await next() : null
-    const callConfig: LlmCallConfig = rawConfig ?? payload?.config ?? {}
-    const agent = payload?.agent
+    const p = payload as OptimizerRequestPayload | undefined
+    const callConfig: LlmCallConfig = rawConfig ?? p?.config ?? {}
+    const agent = p?.agent
 
     let rawPrompt = ''
     try {

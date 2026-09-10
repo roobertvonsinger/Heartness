@@ -19,7 +19,7 @@ if (Test-Path "$RepoDir\.env") {
     }
 }
 
-Write-Host ' Conectando con 9router KVM4 (https://karen.2puty.tech/v1)...' -ForegroundColor Green
+Write-Host ' Conectando con 9router Local (http://127.0.0.1:20128/v1)...' -ForegroundColor Green
 Write-Host " Interfaz Web disponible en: http://127.0.0.1:$Port" -ForegroundColor Green
 
 Set-Location $RepoDir

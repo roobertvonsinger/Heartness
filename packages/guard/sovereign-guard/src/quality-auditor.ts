@@ -40,7 +40,9 @@ export function calculateQualityScore(
 
   // 3. Completeness & Placeholder Detection (0-100)
   let completeness = 100
-  const placeholderMatches = response.match(/\/\/\s*TODO|\/\*\s*TODO|#\s*TODO|\/\/\s*FIXME|\/\/\s*implement later|\.\.\.\s*rest of code/gi) ?? []
+  const placeholderRegex =
+    /\/\/\s*TODO|\/\*\s*TODO|#\s*TODO|\/\/\s*FIXME|\/\/\s*implement later|\.\.\.\s*rest of code/gi
+  const placeholderMatches = response.match(placeholderRegex) ?? []
   if (placeholderMatches.length > 0) {
     completeness -= Math.min(40, placeholderMatches.length * 15)
     flags.push('PLACEHOLDER_DETECTED')
@@ -49,7 +51,9 @@ export function calculateQualityScore(
 
   // 4. Conciseness & Token Efficiency (0-100)
   let conciseness = 95
-  const fillerMatches = response.match(/\b(as an ai language model|i hope this helps|feel free to ask|certainly!|sure, here is|let me know if you need anything else)\b/gi) ?? []
+  const fillerRegex =
+    /\b(as an ai language model|i hope this helps|feel free to ask|certainly!|sure, here is|let me know if you need anything else)\b/gi
+  const fillerMatches = response.match(fillerRegex) ?? []
   if (fillerMatches.length > 0) {
     conciseness -= Math.min(30, fillerMatches.length * 10)
     flags.push('CONVERSATIONAL_FILLER')
@@ -101,9 +105,10 @@ export function registerQualityAuditor(ctx: Context, config: QualityAuditorConfi
   const minPassingScore = config.minPassingScore ?? 85
 
   // Inspect responses on agent execution completion
-  ctx.on('agent/pre-step', async (payload: any, next: any) => {
+  ctx.on('agent/pre-step', async (payload: unknown, next?: () => Promise<unknown>): Promise<unknown> => {
     const downstream = typeof next === 'function' ? await next() : { kind: 'enter' }
-    const messages = payload?.messages ?? []
+    const p = payload as { messages?: Array<{ content?: Array<{ type?: string; text?: string }> }> } | undefined
+    const messages = p?.messages ?? []
 
     if (messages.length > 0) {
       const lastMsg = messages[messages.length - 1]

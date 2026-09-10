@@ -29,8 +29,8 @@ describe('Session Continuity & Inter-Session Memory Suite', () => {
     } catch {}
   })
 
-  it('should save and load delta with checksum verification in TransactionalBrainAdapter', () => {
-    const adapter = new TransactionalBrainAdapter({ dbPath: tempDbPath, walMode: true })
+  it('should save and load delta with checksum verification in TransactionalBrainAdapter', async () => {
+    const adapter = await TransactionalBrainAdapter.create({ dbPath: tempDbPath, walMode: true })
     const delta = {
       sessionId: 'sess-123',
       timestamp: new Date().toISOString(),
@@ -57,8 +57,8 @@ describe('Session Continuity & Inter-Session Memory Suite', () => {
     adapter.close()
   })
 
-  it('should enforce strict bounds (max 5 decisions, max 3 blockers) in SessionDeltaEngine', () => {
-    const engine = new SessionDeltaEngine({
+  it('should enforce strict bounds (max 5 decisions, max 3 blockers) in SessionDeltaEngine', async () => {
+    const engine = await SessionDeltaEngine.create({
       dbPath: tempDbPath,
       maxDecisions: 3,
       maxBlockers: 2,
@@ -88,7 +88,7 @@ describe('Session Continuity & Inter-Session Memory Suite', () => {
     expect(delta.resolvedBlockers[1]).toBe('B4')
 
     // Export to NEXT-SESSION.md
-    const exportedMd = engine.exportToNextSessionMarkdown(delta, tempNextSessionMd)
+    const exportedMd = await engine.writeNextSessionArtifactAsync(delta, tempNextSessionMd)
     expect(exportedMd).toContain('NEXT-SESSION.md — test-repo × Continuidad Soberana')
     expect(exportedMd).toContain('Siguiente paso atómico')
     expect(fs.existsSync(tempNextSessionMd)).toBe(true)
@@ -96,8 +96,8 @@ describe('Session Continuity & Inter-Session Memory Suite', () => {
     engine.close()
   })
 
-  it('should assemble warm start prompt with low token overhead (<250 tokens)', () => {
-    const engine = new SessionDeltaEngine({ dbPath: tempDbPath })
+  it('should assemble warm start prompt with low token overhead (<250 tokens)', async () => {
+    const engine = await SessionDeltaEngine.create({ dbPath: tempDbPath })
     engine.createDelta({
       repository: 'deepseek-harness',
       activeAgent: 'rita',
@@ -111,8 +111,8 @@ describe('Session Continuity & Inter-Session Memory Suite', () => {
       activeFiles: ['tools/live_voice_chat.ts'],
     })
 
-    const primer = new WarmStartPrimer({ dbPath: tempDbPath })
-    const warmPayload = primer.assembleWarmStartPrompt('deepseek-harness')
+    const primer = await WarmStartPrimer.create({ dbPath: tempDbPath })
+    const warmPayload = await primer.assembleWarmStartPrompt('deepseek-harness')
 
     expect(warmPayload.source).toBe('DELTA_CHECKPOINT')
     expect(warmPayload.promptInjection).toContain('CONTINUIDAD INTER-SESIÓN DSH')

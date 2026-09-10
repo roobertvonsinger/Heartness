@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { mkdir, writeFile, readdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -25,7 +26,8 @@ export function extractSemanticExcerpts(
   let codeCount = 0
   let warningCount = 0
 
-  const errorRegex = /\b(error|exception|fatal|panic|traceback|cannot read|undefined is not|uncaught|assertionerror|errno|exit code [1-9]|failure)\b/i
+  const errorRegex =
+    /\b(error|exception|fatal|panic|traceback|cannot read|undefined is not|uncaught|assertionerror|errno|exit code [1-9]|failure)\b/i
   const warningRegex = /\b(warn|warning|deprecated|timeout|retry|exceeded)\b/i
   const codeRegex = /^(?:```|import |export |class |function |interface |type |const |let |var |def |async |return )/
 
@@ -60,6 +62,31 @@ export function extractSemanticExcerpts(
   }
 }
 
+async function pruneOldSpills(dir: string, maxFiles = 150): Promise<void> {
+  try {
+    const files = await readdir(dir)
+    if (files.length > maxFiles) {
+      const stats = await Promise.all(
+        files.map(async (f) => {
+          try {
+            const s = await stat(join(dir, f))
+            return { name: f, time: s.mtimeMs }
+          } catch {
+            return { name: f, time: 0 }
+          }
+        }),
+      )
+      stats.sort((a, b) => a.time - b.time)
+      const toDelete = stats.slice(0, files.length - maxFiles)
+      await Promise.all(
+        toDelete.map(async (item) => {
+          try { await unlink(join(dir, item.name)) } catch {}
+        }),
+      )
+    }
+  } catch {}
+}
+
 export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void {
   if (config.enabled === false) return
 
@@ -68,26 +95,25 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
   const headLines = config.headLines ?? 30
   const tailLines = config.tailLines ?? 30
   const stagingDir = config.stagingDir ?? '_archive/staging/spills'
-  const semanticExcerpting = config.semanticExcerpting !== false
-  const maxMiddleExcerpts = config.maxMiddleExcerpts ?? 40
   const preserveErrors = config.preserveErrors !== false
   const preserveCodeBlocks = config.preserveCodeBlocks !== false
+  const maxMiddleExcerpts = config.maxMiddleExcerpts ?? 40
+  const semanticExcerpting = config.semanticExcerpting !== false
 
   ctx.on('tools/post-execute', async (exec, result, next): Promise<PostToolDecision> => {
     const rawBlocks: ContentBlock[] = Array.isArray(result)
       ? result
-      : (result as any)?.content ?? []
+      : (result as { content?: ContentBlock[] })?.content ?? []
 
     const downstreamResult = typeof next === 'function'
       ? await next()
       : ({ kind: 'accept', content: rawBlocks } as const)
 
-    const downstream: PostToolDecision = downstreamResult ?? { kind: 'accept', content: rawBlocks }
+    const downstream: PostToolDecision = (downstreamResult ?? { kind: 'accept', content: rawBlocks }) as PostToolDecision
 
     if (downstream.kind === 'block') return downstream
     if (exec?.name === 'read' || exec?.name === 'fs_read') return downstream
 
-    // Inspect content blocks
     const targetBlocks: ContentBlock[] = downstream.content ?? rawBlocks
 
     let modified = false
@@ -105,7 +131,8 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
 
       if (lines.length > maxLines || byteLen > maxBytes) {
         try {
-          mkdirSync(stagingDir, { recursive: true })
+          await mkdir(stagingDir, { recursive: true })
+          await pruneOldSpills(stagingDir)
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
           const toolCleanName = (exec?.name ?? 'tool').replace(/[^a-zA-Z0-9_-]/g, '_')
           const spillId = `spill_${timestamp}_${toolCleanName}`
@@ -114,17 +141,14 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
           const filePath = join(stagingDir, fileName)
           const metaPath = join(stagingDir, metaName)
 
-          // Save raw file
-          writeFileSync(filePath, text, 'utf-8')
+          await writeFile(filePath, text, 'utf-8')
 
-          // Calculate SHA256 checksum
           const checksum = createHash('sha256').update(text, 'utf-8').digest('hex')
 
           const headPart = lines.slice(0, headLines).join('\n')
           const tailPart = lines.slice(-tailLines).join('\n')
           const middleLines = lines.slice(headLines, -tailLines)
 
-          // Semantic excerpting
           let excerptText = ''
           let extractedInfo: ExcerptResult = { excerpts: [], errorCount: 0, codeCount: 0, warningCount: 0 }
 
@@ -150,7 +174,6 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
 
           const omittedLines = lines.length - headLines - tailLines - extractedInfo.excerpts.length
 
-          // Save structured metadata
           const metadata: SpillMetadata = {
             spillId,
             timestamp: new Date().toISOString(),
@@ -164,7 +187,7 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
             codeExcerpts: extractedInfo.excerpts.filter(e => e.kind === 'code').map(e => e.line),
             summary: `Spill for ${exec?.name ?? 'tool'}: ${lines.length} lines, ${byteLen} bytes. Found ${extractedInfo.errorCount} error(s), ${extractedInfo.codeCount} code block(s). Checksum: ${checksum.slice(0, 8)}`,
           }
-          writeFileSync(metaPath, JSON.stringify(metadata, null, 2), 'utf-8')
+          await writeFile(metaPath, JSON.stringify(metadata, null, 2), 'utf-8')
 
           const previewParts = [
             `⚡ [SPILL GUARD: Output exceeded threshold (${lines.length} lines, ${byteLen} bytes, checksum: ${checksum.slice(0, 8)}). Full output saved to: ${filePath}]`,
@@ -177,18 +200,19 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
           }
 
           previewParts.push(
-            `... [${omittedLines > 0 ? omittedLines : 0} lines omitted] ...`,
+            `\n... [${omittedLines} lines omitted by Sovereign Spill Guard] ...\n`,
             '--- TAIL PREVIEW ---',
             tailPart,
+            `\n💡 [To read full output, inspect file: ${filePath}]`,
           )
 
           transformedBlocks.push({
             type: 'text',
             text: previewParts.join('\n'),
           })
+
           modified = true
-        } catch (e) {
-          ctx.logger?.warn?.(`spill-guard failed to write staging file: ${String(e)}`)
+        } catch {
           transformedBlocks.push(block)
         }
       } else {
@@ -208,12 +232,14 @@ export function registerSpillGuard(ctx: Context, config: SpillGuardConfig): void
   }, { prepend: true })
 }
 
-export function readSpillMetadata(metaFilePath: string): SpillMetadata | undefined {
+/**
+ * Lee metadata de spill de forma async (no bloquea el event loop).
+ */
+export async function readSpillMetadata(metaFilePath: string): Promise<SpillMetadata | undefined> {
   try {
-    const content = readFileSync(metaFilePath, 'utf-8')
+    const content = await readFile(metaFilePath, 'utf-8')
     return JSON.parse(content)
   } catch {
     return undefined
   }
 }
-

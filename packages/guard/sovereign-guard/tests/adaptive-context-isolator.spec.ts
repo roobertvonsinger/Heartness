@@ -38,7 +38,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
     it('prunes aggressively under high context pressure and archives omitted state to Roz Engine', async () => {
       const tempStaging = join(tmpdir(), 'dsh-test-adaptive-roz-' + Date.now())
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         contextIsolator: {
           enabled: true,
           adaptive: {
@@ -65,7 +65,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
         )
       }
 
-      const agent = { id: 'agent-adaptive-01', options: { model: 'mistral/large-latest' } } as any
+      const agent = { id: 'agent-adaptive-01', options: { model: 'mistral/large-latest' } }
       const decision = await ctx.waterfall(
         'agent/pre-step',
         { agent, messages },
@@ -88,7 +88,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
         expect(existsSync(backupFile)).toBe(true)
 
         const roz = new RozRecycleEngine(tempStaging)
-        const restored = roz.restoreContextData(backupFile)
+        const restored = await roz.restoreContextData(backupFile)
         expect(restored).toBeDefined()
         expect(restored.contextId).toBe('agent-adaptive-01')
         expect(Array.isArray(restored.data)).toBe(true)
@@ -102,7 +102,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
   describe('Early Warning System', () => {
     it('injects advisory warning when usage reaches 50% without truncating', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         contextIsolator: {
           enabled: true,
           adaptive: {
@@ -125,7 +125,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
         createUserMessage({ content: [{ type: 'text', text: 'Turn 6' }], source: { kind: 'user' } }),
       ]
 
-      const agent = { options: { model: 'mistral/codestral-2501' } } as any
+      const agent = { options: { model: 'mistral/codestral-2501' } }
       const decision = await ctx.waterfall(
         'agent/pre-step',
         { agent, messages },
@@ -145,7 +145,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
 
     it('injects elevated warning at 75% threshold', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         contextIsolator: {
           enabled: true,
           adaptive: {
@@ -165,7 +165,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
         createUserMessage({ content: [{ type: 'text', text: largeText }], source: { kind: 'user' } }),
       ]
 
-      const agent = { options: { model: 'ag/gemini-3.7-flash-high' } } as any
+      const agent = { options: { model: 'ag/gemini-3.7-flash-high' } }
       const decision = await ctx.waterfall(
         'agent/pre-step',
         { agent, messages },
@@ -185,7 +185,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
   describe('Adaptive Multi-Model Scaling (Gemini 3.7 Flash High vs Small Models)', () => {
     it('preserves full 1M context for Gemini 3.7 while strictly scaling down for low-budget models', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         contextIsolator: {
           enabled: true,
           rules: [
@@ -201,7 +201,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
       )
 
       // 1. Gemini: 8 turns is <10% of 50 turns -> no pruning
-      const geminiAgent = { options: { model: 'ag/gemini-3.7-flash-high' } } as any
+      const geminiAgent = { options: { model: 'ag/gemini-3.7-flash-high' } }
       const gDec = await ctx.waterfall(
         'agent/pre-step',
         { agent: geminiAgent, messages },
@@ -213,7 +213,7 @@ describe('Adaptive Context Isolator Suite (Issue #13)', () => {
       }
 
       // 2. Venice: 8 turns exceeds maxTurns 4 -> adaptive pruning active
-      const veniceAgent = { options: { model: 'venice-uncensored-1-2' } } as any
+      const veniceAgent = { options: { model: 'venice-uncensored-1-2' } }
       const vDec = await ctx.waterfall(
         'agent/pre-step',
         { agent: veniceAgent, messages },

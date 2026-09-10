@@ -17,13 +17,13 @@ import {
 const command = process.argv[2] || 'brief'
 
 async function run() {
-  const engine = new SessionDeltaEngine()
-  const primer = new WarmStartPrimer()
+  const engine = await SessionDeltaEngine.create()
+  const primer = await WarmStartPrimer.create()
 
   try {
     switch (command) {
       case 'warm-start': {
-        const payload = primer.assembleWarmStartPrompt()
+        const payload = await primer.assembleWarmStartPrompt()
         console.log(payload.promptInjection)
         console.error(`\n[Warm Start: ${payload.source} | Est. Tokens: ~${payload.estimatedTokens} | Integrity: ${payload.integrityVerified ? 'OK' : 'FAIL'}]`)
         break
@@ -84,7 +84,7 @@ async function run() {
           testTelemetry,
         })
 
-        engine.exportToNextSessionMarkdown(delta)
+        await engine.writeNextSessionArtifactAsync(delta)
         console.log(`✅ Delta factual guardado exitosamente en brain.db y NEXT-SESSION.md (ID: ${delta.sessionId})`)
         break
       }

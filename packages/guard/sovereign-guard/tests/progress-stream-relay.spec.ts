@@ -5,7 +5,6 @@ import {
   pillToFrame,
   createCompletionFrame,
   createProgressRelaySession,
-  registerProgressStreamRelay,
 } from '../src/progress-stream-relay.ts'
 import { generateStepPill } from '../src/step-feedback.ts'
 import type { ProgressFrame } from '../src/types.ts'
@@ -186,21 +185,21 @@ describe('Progressive Streaming Feedback Relay', () => {
   })
 
   describe('5. Cordis Integration', () => {
-    it('registers relay into Cordis context without errors', () => {
+    it('registers relay into Cordis context without errors', async () => {
       const ctx = new Context()
-      expect(() => {
+      await expect(
         SovereignGuard.apply(ctx, {
           stepFeedback: { enabled: true },
           progressStream: { enabled: true },
-        })
-      }).not.toThrow()
+        }),
+      ).resolves.not.toThrow()
     })
 
     it('emits progress/stream-frame events when step pills are dispatched', async () => {
       const ctx = new Context()
       const frames: ProgressFrame[] = []
 
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         stepFeedback: { enabled: true },
         progressStream: { enabled: true, rateLimitMs: 0 }, // No rate limit for test
       })

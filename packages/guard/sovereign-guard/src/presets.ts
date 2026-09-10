@@ -79,8 +79,13 @@ export const SOVEREIGN_PRESETS: Record<string, SovereignPresetDefinition> = {
  * Resolves a preset definition by ID, falling back to sovereign-coder.
  */
 export function resolveSovereignPreset(presetId?: string): SovereignPresetDefinition {
-  if (presetId && SOVEREIGN_PRESETS[presetId]) {
-    return SOVEREIGN_PRESETS[presetId]!
+  if (presetId && presetId in SOVEREIGN_PRESETS) {
+    const preset = SOVEREIGN_PRESETS[presetId]
+    if (preset) return preset
   }
-  return SOVEREIGN_PRESETS['sovereign-coder']!
+  const defaultPreset = SOVEREIGN_PRESETS['sovereign-coder']
+  if (!defaultPreset) {
+    throw new Error('Default preset "sovereign-coder" is not defined')
+  }
+  return defaultPreset
 }

@@ -23,7 +23,7 @@ function scanDirs(dir: string) {
               console.log(`Linked ${shortName} -> ${pkgPath}`)
             }
           }
-        } catch (e) {
+        } catch (_e) {
           // ignore
         }
       }

@@ -9,8 +9,8 @@ import {
 } from '../src/session-continuity.ts'
 
 describe('Session Verifiable Artifact & Continuity Engine', () => {
-  it('extracts factual git telemetry from active repository', () => {
-    const engine = new SessionDeltaEngine()
+  it('extracts factual git telemetry from active repository', async () => {
+    const engine = await SessionDeltaEngine.create()
     const gitInfo = engine.extractGitTelemetry()
 
     expect(gitInfo).toBeDefined()
@@ -23,13 +23,13 @@ describe('Session Verifiable Artifact & Continuity Engine', () => {
     engine.close()
   })
 
-  it('renders verifiable factual markdown with git telemetry and test metrics', () => {
+  it('renders verifiable factual markdown with git telemetry and test metrics', async () => {
     const tmpDir = path.resolve(process.cwd(), 'node_modules', '.tmp-verifiable-test')
     if (!fs.existsSync(tmpDir)) {
       fs.mkdirSync(tmpDir, { recursive: true })
     }
     const testMdPath = path.join(tmpDir, 'TEST-NEXT-SESSION.md')
-    const engine = new SessionDeltaEngine({ dbPath: path.join(tmpDir, 'test-brain.db') })
+    const engine = await SessionDeltaEngine.create({ dbPath: path.join(tmpDir, 'test-brain.db') })
 
     const gitTelemetry: SessionGitTelemetry = {
       branch: 'master',
@@ -61,7 +61,7 @@ describe('Session Verifiable Artifact & Continuity Engine', () => {
       testTelemetry,
     })
 
-    const mdOutput = engine.exportToNextSessionMarkdown(delta, testMdPath)
+    const mdOutput = await engine.writeNextSessionArtifactAsync(delta, testMdPath)
 
     expect(fs.existsSync(testMdPath)).toBe(true)
     expect(mdOutput).toContain('NEXT-SESSION —')
@@ -79,13 +79,13 @@ describe('Session Verifiable Artifact & Continuity Engine', () => {
     } catch {}
   })
 
-  it('injects automatic blocking alert when test telemetry reports test failures', () => {
+  it('injects automatic blocking alert when test telemetry reports test failures', async () => {
     const tmpDir = path.resolve(process.cwd(), 'node_modules', '.tmp-failing-test')
     if (!fs.existsSync(tmpDir)) {
       fs.mkdirSync(tmpDir, { recursive: true })
     }
     const testMdPath = path.join(tmpDir, 'TEST-FAIL-NEXT-SESSION.md')
-    const engine = new SessionDeltaEngine({ dbPath: path.join(tmpDir, 'test-fail-brain.db') })
+    const engine = await SessionDeltaEngine.create({ dbPath: path.join(tmpDir, 'test-fail-brain.db') })
 
     const testTelemetry: SessionTestTelemetry = {
       passed: 10,
@@ -102,7 +102,7 @@ describe('Session Verifiable Artifact & Continuity Engine', () => {
       testTelemetry,
     })
 
-    const mdOutput = engine.exportToNextSessionMarkdown(delta, testMdPath)
+    const mdOutput = await engine.writeNextSessionArtifactAsync(delta, testMdPath)
 
     expect(mdOutput).toContain('🔴 BLOQUEO / RIESGO ACTIVO')
     expect(mdOutput).toContain('2 tests fallaron')
@@ -115,9 +115,9 @@ describe('Session Verifiable Artifact & Continuity Engine', () => {
     } catch {}
   })
 
-  it('generates warm start prompt injection bounded < 250 tokens from factual artifact', () => {
-    const primer = new WarmStartPrimer()
-    const payload = primer.assembleWarmStartPrompt()
+  it('generates warm start prompt injection bounded < 250 tokens from factual artifact', async () => {
+    const primer = await WarmStartPrimer.create()
+    const payload = await primer.assembleWarmStartPrompt()
 
     expect(payload).toBeDefined()
     expect(typeof payload.promptInjection).toBe('string')

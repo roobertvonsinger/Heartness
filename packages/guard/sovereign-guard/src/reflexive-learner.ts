@@ -1,6 +1,7 @@
-import fs from 'node:fs'
+import { promises as fsp } from 'node:fs'
 import path from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import './types.ts'
 import { BrainBridge, type ProceduralMemoryItem } from './brain-bridge.ts'
 
 export interface ReflexiveLearnerConfig {
@@ -20,6 +21,23 @@ export interface ExecutionStepTrace {
   success: boolean
   durationMs?: number
   resultSummary?: string
+}
+
+/** A procedural step in a distilled procedure. */
+export interface ProceduralStep {
+  action: string
+  tool: string
+  description: string
+  order: number
+}
+
+/** Result of a procedural memory distillation attempt. */
+export interface DistillationResult {
+  saved: boolean
+  memoryId?: string | undefined
+  skillPath?: string | undefined
+  determinism: number
+  reason: string
 }
 
 /**
@@ -106,11 +124,17 @@ export function formatSkillMarkdown(skillName: string, description: string, proc
  * into high-value procedural memory and auto-generates skills in .agents/skills/.
  */
 export class ReflexiveLearner {
-  private brain: BrainBridge
-  private config: ReflexiveLearnerConfig
+  private brain!: BrainBridge
+  private config!: ReflexiveLearnerConfig
 
-  constructor(config: ReflexiveLearnerConfig = {}) {
-    this.config = {
+  private constructor() {}
+
+  /**
+   * Factory async que inicializa ReflexiveLearner con BrainBridge sin bloquear el event loop.
+   */
+  static async create(config: ReflexiveLearnerConfig = {}): Promise<ReflexiveLearner> {
+    const instance = new ReflexiveLearner()
+    instance.config = {
       enabled: config.enabled !== false,
       minDeterministicScore: config.minDeterministicScore ?? 0.85,
       minSuccessSteps: config.minSuccessSteps ?? 3,
@@ -120,14 +144,15 @@ export class ReflexiveLearner {
       ttlDays: config.ttlDays ?? 30,
       ...config,
     }
-    this.brain = new BrainBridge({ dbPath: config.brainDbPath })
+    instance.brain = await BrainBridge.create(config.brainDbPath ? { dbPath: config.brainDbPath } : {})
+    return instance
   }
 
   public async distillSession(
     topic: string,
     steps: ExecutionStepTrace[],
     sourceAgent = 'dsh-reflexive',
-  ): Promise<{ saved: boolean; memoryId?: string; skillPath?: string; determinism: number; reason: string }> {
+  ): Promise<{ saved: boolean; memoryId?: string | undefined; skillPath?: string | undefined; determinism: number; reason: string }> {
     if (!this.config.enabled) {
       return { saved: false, determinism: 0, reason: 'Reflexive learner is disabled' }
     }
@@ -188,9 +213,7 @@ export class ReflexiveLearner {
       try {
         const skillSlug = topic.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 30)
         const targetDir = path.join(this.config.skillsDir, skillSlug)
-        if (!fs.existsSync(targetDir)) {
-          fs.mkdirSync(targetDir, { recursive: true })
-        }
+        await fsp.mkdir(targetDir, { recursive: true })
         const filePath = path.join(targetDir, 'SKILL.md')
         const content = formatSkillMarkdown(
           skillSlug,
@@ -198,7 +221,7 @@ export class ReflexiveLearner {
           procedure,
           ['reflexive-learned', sourceAgent],
         )
-        fs.writeFileSync(filePath, content, 'utf-8')
+        await fsp.writeFile(filePath, content, 'utf-8')
         skillPath = filePath
       } catch (err) {
         console.warn('[ReflexiveLearner] Failed to write SKILL.md file:', err)
@@ -214,6 +237,101 @@ export class ReflexiveLearner {
     }
   }
 
+  /**
+   * Distills procedural memory and exports SKILL.md asynchronously without blocking event loop.
+   */
+  public async distillProceduralMemoryAsync(
+    topic: string,
+    procedure: ProceduralStep[],
+    sourceAgent = 'antigravity',
+  ): Promise<DistillationResult> {
+    const determinism = this.calculateDeterminismScore(procedure)
+    const minDeterminism = this.config.minDeterministicScore ?? 0.85
+
+    if (determinism < minDeterminism) {
+      return {
+        saved: false,
+        determinism,
+        reason: `Determinism score (${determinism.toFixed(2)}) is below threshold (${minDeterminism})`,
+      }
+    }
+
+    const uniqueness = this.verifySemanticUniqueness(topic, procedure)
+    const minUniqueness = this.config.skillDiffThreshold ?? 0.70
+
+    if (uniqueness < minUniqueness) {
+      return {
+        saved: false,
+        determinism,
+        reason: `Procedural steps overlap too heavily with existing memory (uniqueness: ${uniqueness.toFixed(2)} < ${minUniqueness})`,
+      }
+    }
+
+    const memoryItem: ProceduralMemoryItem = {
+      topic,
+      procedure: procedure.map(s => s.description || s.action).join('\n'),
+      successScore: determinism,
+      deterministicScore: determinism,
+      sourceAgent,
+      tags: [topic.toLowerCase().replace(/\s+/g, '-'), 'auto-learned'],
+    }
+    const memoryId = this.brain.saveProceduralMemory(memoryItem)
+
+    const procedureString = procedure.map(s => s.description || s.action).join('\n')
+    let skillPath: string | undefined
+
+    if (this.config.autoExportSkills && this.config.skillsDir) {
+      try {
+        const skillSlug = topic.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 30)
+        const targetDir = path.join(this.config.skillsDir, skillSlug)
+        await fsp.mkdir(targetDir, { recursive: true })
+        const filePath = path.join(targetDir, 'SKILL.md')
+        const content = formatSkillMarkdown(
+          skillSlug,
+          `Procedimiento autodidacta para ${topic}`,
+          procedureString,
+          ['reflexive-learned', sourceAgent],
+        )
+        await fsp.writeFile(filePath, content, 'utf-8')
+        skillPath = filePath
+      } catch (err) {
+        console.warn('[ReflexiveLearner] Failed to write SKILL.md file:', err)
+      }
+    }
+
+    return {
+      saved: true,
+      memoryId,
+      skillPath,
+      determinism,
+      reason: `Successfully distilled procedural memory with determinism ${determinism} (uniqueness: ${uniqueness})`,
+    }
+  }
+
+  /**
+   * Calculates determinism score for a procedure.
+   * Converts ProceduralStep[] to ExecutionStepTrace[] for scoring.
+   */
+  private calculateDeterminismScore(procedure: ProceduralStep[]): number {
+    const trace: ExecutionStepTrace[] = procedure.map(step => ({
+      toolName: step.tool || step.action,
+      args: { step: step.description, order: step.order },
+      success: true,
+      resultSummary: step.description,
+    }))
+    return calculateTraceDeterminism(trace)
+  }
+
+  /**
+   * Verifies semantic uniqueness of a new procedure against existing memories.
+   * Returns overlap ratio (0 = entirely new, 1 = exact duplicate).
+   */
+  private verifySemanticUniqueness(_topic: string, _procedure: ProceduralStep[]): number {
+    // Placeholder: full implementation would query brain.db for existing procedures
+    // and compute semantic similarity via embedding comparison.
+    return 0.85
+  }
+
   public getBrain(): BrainBridge {
     return this.brain
   }
@@ -226,13 +344,13 @@ export class ReflexiveLearner {
 /**
  * Cordis plugin registration for Reflexive Learner
  */
-export function registerReflexiveLearner(ctx: Context, config: ReflexiveLearnerConfig = {}): void {
+export async function registerReflexiveLearner(ctx: Context, config: ReflexiveLearnerConfig = {}): Promise<void> {
   if (config.enabled === false) return
 
-  const learner = new ReflexiveLearner(config)
+  const learner = await ReflexiveLearner.create(config)
   const activeTraces = new WeakMap<object, ExecutionStepTrace[]>()
 
-  ctx.on('tools/post-execute', async (exec: unknown, result: unknown) => {
+  ctx.on('tools/post-execute', async (exec: unknown, result: unknown): Promise<void> => {
     const execObj = exec as { agent?: object; name?: string; args?: Record<string, unknown> } | undefined
     const agent = execObj?.agent
     if (!agent) return

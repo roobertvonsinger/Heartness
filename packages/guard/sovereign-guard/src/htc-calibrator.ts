@@ -97,6 +97,7 @@ export class HTCCalibrator {
 
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i]
+      if (!step) continue
       const toolName = step.toolName || 'unknown'
       toolCounts[toolName] = (toolCounts[toolName] || 0) + 1
 
@@ -117,7 +118,7 @@ export class HTCCalibrator {
         // Compounding error penalty weighted exponentially: dynamicLambda^(T - (i + 1))
         errorSum += Math.pow(dynamicLambda, T - (i + 1))
         // Check if subsequent step succeeded (recovery)
-        if (i + 1 < steps.length && steps[i + 1].success) {
+        if (i + 1 < steps.length && steps[i + 1]?.success) {
           recoveredCount++
         }
       }

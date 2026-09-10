@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { promises as fsPromises } from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
@@ -12,14 +13,14 @@ export interface TaskParkingItem {
 }
 
 export interface ProceduralMemoryItem {
-  id?: string
+  id?: string | undefined
   topic: string
   procedure: string
   successScore: number
   deterministicScore: number
-  sourceAgent?: string
-  tags?: string[]
-  createdAt?: string
+  sourceAgent?: string | undefined
+  tags?: string[] | undefined
+  createdAt?: string | undefined
 }
 
 export interface BrainBridgeConfig {
@@ -59,29 +60,64 @@ interface RawPrefRow {
  */
 export class BrainBridge {
   private db: DatabaseSync | null = null
-  private dbPath: string
+  private dbPath!: string
   private isInitialized = false
 
-  constructor(config: BrainBridgeConfig = {}) {
+  private constructor() {}
+
+  /**
+   * Factory async que inicializa el directorio y la base de datos sin bloquear el event loop.
+   */
+  static async create(config: BrainBridgeConfig = {}): Promise<BrainBridge> {
+    const instance = new BrainBridge()
     const rawPath = config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db')
-    this.dbPath = rawPath
-    this.initDb(config.walMode !== false, config.busyTimeout ?? 5000)
+    instance.dbPath = rawPath
+    await instance.initDb(config.walMode !== false, config.busyTimeout ?? 5000)
+    instance.isInitialized = true
+    return instance
   }
 
-  private initDb(wal: boolean, timeout: number): void {
+  /**
+   * @deprecated Use await BrainBridge.create() instead.
+   * Retained for cases where sync construction is unavoidable.
+   */
+  static createSync(config: BrainBridgeConfig = {}): BrainBridge {
+    const instance = new BrainBridge()
+    const rawPath = config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db')
+    instance.dbPath = rawPath
     try {
-      const dir = path.dirname(this.dbPath)
+      const dir = path.dirname(instance.dbPath)
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true })
       }
+    } catch {
+      // best effort
+    }
+    instance.db = new DatabaseSync(instance.dbPath)
+    instance.initWal(instance.db, config.walMode !== false, config.busyTimeout ?? 5000)
+    instance.isInitialized = true
+    return instance
+  }
 
+  private initWal(db: DatabaseSync, wal: boolean, timeout: number): void {
+    if (wal) {
+      db.exec('PRAGMA journal_mode = WAL;')
+      db.exec('PRAGMA synchronous = NORMAL;')
+    }
+    db.exec(`PRAGMA busy_timeout = ${Math.max(1000, timeout)};`)
+  }
+
+  private async initDb(wal: boolean, timeout: number): Promise<void> {
+    try {
+      const dir = path.dirname(this.dbPath)
+      await fsPromises.mkdir(dir, { recursive: true })
+    } catch {
+      // best effort — parent dir creation is non-fatal
+    }
+
+    try {
       this.db = new DatabaseSync(this.dbPath)
-
-      if (wal) {
-        this.db.exec('PRAGMA journal_mode = WAL;')
-        this.db.exec('PRAGMA synchronous = NORMAL;')
-      }
-      this.db.exec(`PRAGMA busy_timeout = ${Math.max(1000, timeout)};`)
+      this.initWal(this.db, wal, timeout)
 
       // Create schema tables if not exist
       this.db.exec(`
@@ -153,7 +189,7 @@ export class BrainBridge {
     }
     query += ' ORDER BY created_at DESC'
     const stmt = this.db.prepare(query)
-    const rows = stmt.all(...params) as unknown as RawTaskRow[]
+    const rows = (stmt as unknown as { all(...params: unknown[]): RawTaskRow[] }).all(...params as unknown[])
 
     return rows.map(r => ({
       id: r.id,

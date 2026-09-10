@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { promises as fsPromises } from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { Context } from '@deepseek-ai/cordis'
@@ -11,9 +12,9 @@ export interface GraphNodeRecord {
   id: string
   kind: GraphNodeKind
   label: string
-  properties?: Record<string, unknown>
-  accessCount?: number
-  lastActivatedAt?: string
+  properties?: Record<string, unknown> | undefined
+  accessCount?: number | undefined
+  lastActivatedAt?: string | undefined
 }
 
 export interface GraphEdgeRecord {
@@ -23,7 +24,7 @@ export interface GraphEdgeRecord {
   weight: number
   htcScore: number
   evidenceCount: number
-  updatedAt?: string
+  updatedAt?: string | undefined
 }
 
 export interface CalibratedPrior {
@@ -75,35 +76,74 @@ interface RawEdgeRow {
  */
 export class BrainGraph {
   private db: DatabaseSync | null = null
-  private dbPath: string
+  private dbPath!: string
   private isInitialized = false
-  private eta: number
-  private decayHalfLife: number
-  private minPruneWeight: number
+  private eta!: number
+  private decayHalfLife!: number
+  private minPruneWeight!: number
   private inMemoryNodeCache = new Map<string, GraphNodeRecord>()
 
-  constructor(config: BrainGraphConfig = {}) {
-    this.dbPath = config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db')
-    this.eta = config.hebbianLearningRate ?? 0.15
-    this.decayHalfLife = config.decayHalfLifeDays ?? 14
-    this.minPruneWeight = config.minPruneWeight ?? 0.15
-    this.initDb(config.walMode !== false, config.busyTimeout ?? 5000)
+  private constructor() {}
+
+  /**
+   * Factory async que inicializa el directorio y la base de datos sin bloquear el event loop.
+   */
+  static async create(config: BrainGraphConfig = {}): Promise<BrainGraph> {
+    const instance = new BrainGraph()
+    instance.dbPath = config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db')
+    instance.eta = config.hebbianLearningRate ?? 0.15
+    instance.decayHalfLife = config.decayHalfLifeDays ?? 14
+    instance.minPruneWeight = config.minPruneWeight ?? 0.15
+    await instance.initDb(config.walMode !== false, config.busyTimeout ?? 5000)
+    instance.isInitialized = true
+    return instance
   }
 
-  private initDb(wal: boolean, timeout: number): void {
+  /**
+   * @deprecated Use await BrainGraph.create() instead.
+   * Retained for sync test contexts where DatabaseSync blocks are unavoidable.
+   */
+  static createSync(config: BrainGraphConfig = {}): BrainGraph {
+    const instance = new BrainGraph()
+    instance.dbPath = config.dbPath || path.resolve(process.cwd(), 'data', 'brain.db')
+    instance.eta = config.hebbianLearningRate ?? 0.15
+    instance.decayHalfLife = config.decayHalfLifeDays ?? 14
+    instance.minPruneWeight = config.minPruneWeight ?? 0.15
+    instance.initDbSync(config.walMode !== false, config.busyTimeout ?? 5000)
+    instance.isInitialized = true
+    return instance
+  }
+
+  private initDbSync(wal: boolean, timeout: number): void {
     try {
       const dir = path.dirname(this.dbPath)
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true })
       }
+    } catch {}
+    this.db = new DatabaseSync(this.dbPath)
+    this.initWal(wal, timeout)
+  }
 
+  private initWal(wal: boolean, timeout: number): void {
+    if (wal) {
+      this.db?.exec('PRAGMA journal_mode = WAL;')
+      this.db?.exec('PRAGMA synchronous = NORMAL;')
+    }
+    this.db?.exec(`PRAGMA busy_timeout = ${Math.max(1000, timeout)};`)
+  }
+
+  private async initDb(wal: boolean, timeout: number): Promise<void> {
+    try {
+      const dir = path.dirname(this.dbPath)
+      await fsPromises.mkdir(dir, { recursive: true })
+    } catch {
+      // best effort — parent dir creation is non-fatal
+    }
+
+    try {
       this.db = new DatabaseSync(this.dbPath)
-
-      if (wal) {
-        this.db.exec('PRAGMA journal_mode = WAL;')
-        this.db.exec('PRAGMA synchronous = NORMAL;')
-      }
-      this.db.exec(`PRAGMA busy_timeout = ${Math.max(1000, timeout)};`)
+      this.initWal(wal, timeout)
 
       // Create Graph Schema
       this.db.exec(`
@@ -231,7 +271,7 @@ export class BrainGraph {
       params.push(relation)
     }
     const stmt = this.db.prepare(query)
-    const rows = stmt.all(...params) as unknown as RawEdgeRow[]
+    const rows = (stmt as unknown as { all(...params: unknown[]): RawEdgeRow[] }).all(...params as unknown[])
 
     return rows.map(r => ({
       sourceId: r.source_id,
@@ -274,9 +314,12 @@ export class BrainGraph {
     // Dynamic Hebbian Edge Reinforcement / Penalty along the step chain
     if (trace.steps && trace.steps.length > 1) {
       for (let i = 0; i < trace.steps.length - 1; i++) {
-        const srcTool = trace.steps[i].toolName
-        const tgtTool = trace.steps[i + 1].toolName
-        const stepSuccess = trace.steps[i].success && trace.steps[i + 1].success
+        const stepA = trace.steps[i]
+        const stepB = trace.steps[i + 1]
+        if (!stepA || !stepB) continue
+        const srcTool = stepA.toolName
+        const tgtTool = stepB.toolName
+        const stepSuccess = stepA.success && stepB.success
 
         this.upsertNode({ id: `tool:${srcTool}`, kind: 'TOOL', label: srcTool })
         this.upsertNode({ id: `tool:${tgtTool}`, kind: 'TOOL', label: tgtTool })
@@ -330,21 +373,26 @@ export class BrainGraph {
     let matchedSubgraphs = 0
 
     for (let i = 0; i < toolsPlanned.length - 1; i++) {
-      const src = `tool:${toolsPlanned[i]}`
-      const tgt = `tool:${toolsPlanned[i + 1]}`
+      const toolCurr = toolsPlanned[i]
+      const toolNext = toolsPlanned[i + 1]
+      if (!toolCurr || !toolNext) continue
+      const src = `tool:${toolCurr}`
+      const tgt = `tool:${toolNext}`
 
       const degraded = this.getOutgoingEdges(src, 'DEGRADES').filter(e => e.targetId === tgt)
-      if (degraded.length > 0) {
+      const firstDegraded = degraded[0]
+      if (firstDegraded) {
         matchedSubgraphs++
-        penalty += 0.25 * degraded[0].weight
-        degradedPatterns.push(`${toolsPlanned[i]} -> ${toolsPlanned[i + 1]} (degradation weight: ${degraded[0].weight})`)
+        penalty += 0.25 * firstDegraded.weight
+        degradedPatterns.push(`${toolCurr} -> ${toolNext} (degradation weight: ${firstDegraded.weight})`)
       }
 
       const reinforced = this.getOutgoingEdges(src, 'REINFORCES').filter(e => e.targetId === tgt)
-      if (reinforced.length > 0) {
+      const firstReinforced = reinforced[0]
+      if (firstReinforced) {
         matchedSubgraphs++
-        boost += 0.10 * Math.min(2.0, reinforced[0].weight)
-        recommendedTools.push(toolsPlanned[i + 1])
+        boost += 0.10 * Math.min(2.0, firstReinforced.weight)
+        recommendedTools.push(toolNext)
       }
     }
 
@@ -446,17 +494,18 @@ export class BrainGraph {
 /**
  * Registers Brain Graph plugin in Cordis context.
  */
-export function registerBrainGraph(ctx: Context, config: BrainGraphConfig = {}): void {
-  const graph = new BrainGraph(config)
-  ctx.provide('brainGraph' as never, graph)
+export async function registerBrainGraph(ctx: Context, config: BrainGraphConfig = {}): Promise<void> {
+  const graph = await BrainGraph.create(config)
+  ctx.provide('brainGraph', graph)
 
   // Pre-flight prior check in agent/pre-step (<2ms non-blocking)
-  ctx.on('agent/pre-step' as never, async (payload: { messages?: Array<{ role?: string; content?: unknown }> }) => {
+  ctx.on('agent/pre-step', async (payload: unknown) => {
     try {
-      const messages = payload?.messages ?? []
+      const p = payload as { messages?: Array<{ role?: string; content?: unknown }> } | undefined
+      const messages = p?.messages ?? []
       if (!messages || messages.length === 0) return
 
-      const lastUserMsg = messages.filter(m => m.role === 'user').pop()
+      const lastUserMsg = messages.filter((m: { role?: string; content?: unknown }) => m.role === 'user').pop()
       if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return
 
       const text = lastUserMsg.content
@@ -482,7 +531,7 @@ export function registerBrainGraph(ctx: Context, config: BrainGraphConfig = {}):
   })
 
   // Automatic consolidation & Hebbian decay on session end
-  ctx.on('session/end' as never, () => {
+  ctx.on('session/end', () => {
     try {
       graph.pruneAndConsolidate()
     } catch {}

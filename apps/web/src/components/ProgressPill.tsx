@@ -41,7 +41,7 @@ export const ProgressPill: React.FC = () => {
 
       try {
         ws = new WebSocket(wsUrl)
-      } catch (err) {
+      } catch (_err) {
         // Fallback retry if socket instantiation fails
         reconnectTimer = window.setTimeout(connect, 2000)
         return

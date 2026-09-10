@@ -88,12 +88,12 @@ export function registerKeepAliveGateway(ctx: Context, config: KeepAliveGatewayC
   const intervalMs = config.intervalMs ?? 15000
   const pulseString = config.pulseString ?? ': keep-alive\n\n'
 
-  ctx.on('ready' as any, () => {
+  ctx.on('ready', () => {
     // Registered in context for stream adapters and gateway handlers
   })
 
   // Hook into agent/request to ensure active sessions maintain keep-alive
-  ctx.on('agent/request' as any, async (session: unknown, next: any) => {
+  ctx.on('agent/request', async (session: unknown, next) => {
     let sessionPulse: KeepAliveSession | null = null
 
     if (session && typeof session === 'object' && 'writeStream' in session && typeof (session as { writeStream: (c: string) => void }).writeStream === 'function') {
@@ -108,7 +108,7 @@ export function registerKeepAliveGateway(ctx: Context, config: KeepAliveGatewayC
       if (typeof next === 'function') {
         return await next()
       }
-      return session as any
+      return session as unknown
     } finally {
       if (sessionPulse) {
         sessionPulse.stop()

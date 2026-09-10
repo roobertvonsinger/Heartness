@@ -11,7 +11,7 @@ describe('Sovereign Guard Suite', () => {
   describe('Context Isolator', () => {
     it('prunes older turns for low-context models (e.g. Venice) while leaving Gemini untouched', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         contextIsolator: {
           enabled: true,
           rules: [
@@ -30,7 +30,7 @@ describe('Sovereign Guard Suite', () => {
       ]
 
       // Venice agent
-      const veniceAgent = { options: { model: 'venice-uncensored-1-2' } } as any
+      const veniceAgent = { options: { model: 'venice-uncensored-1-2' } }
       const veniceDecision = await ctx.waterfall(
         'agent/pre-step',
         { agent: veniceAgent, messages: msgs },
@@ -44,7 +44,7 @@ describe('Sovereign Guard Suite', () => {
       }
 
       // Gemini agent
-      const geminiAgent = { options: { model: 'ag/gemini-3.7-flash-high' } } as any
+      const geminiAgent = { options: { model: 'ag/gemini-3.7-flash-high' } }
       const geminiDecision = await ctx.waterfall(
         'agent/pre-step',
         { agent: geminiAgent, messages: msgs },
@@ -62,7 +62,7 @@ describe('Sovereign Guard Suite', () => {
     it('spills tool results exceeding maxLines to disk and returns head/tail preview', async () => {
       const tempStaging = join(tmpdir(), 'dsh-test-spills-' + Date.now())
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         spillGuard: {
           enabled: true,
           maxLines: 10,
@@ -73,15 +73,15 @@ describe('Sovereign Guard Suite', () => {
       })
 
       const longText = Array.from({ length: 50 }, (_, i) => `Line ${i + 1}`).join('\n')
-      const exec = { name: 'run_bash' } as any
+      const exec = { name: 'run_bash' }
       const result = [{ type: 'text' as const, text: longText }]
 
-      const decision = await ctx.waterfall(
+      const decision = (await ctx.waterfall(
         'tools/post-execute',
         exec,
         result,
         () => ({ kind: 'accept', content: result }),
-      ) as any
+      )) as { kind: string; content?: Array<{ type: string; text: string }> }
       expect(decision.kind).toBe('accept')
       if (decision.kind === 'accept' && decision.content) {
         const text = decision.content[0]?.type === 'text' ? decision.content[0].text : ''
@@ -95,19 +95,20 @@ describe('Sovereign Guard Suite', () => {
   })
 
   describe('Roz Recycle Buffer', () => {
-    it('safely stages backups and respects retention window', () => {
+    it('safely stages backups and respects retention window', async () => {
       const tempStaging = join(tmpdir(), 'dsh-test-roz-' + Date.now())
       const engine = new RozRecycleEngine(tempStaging, 48)
+      await engine.init()
 
       const testFile = join(tempStaging, 'sample_code.ts')
       writeFileSync(testFile, 'export const x = 42;')
 
-      const backupPath = engine.backupFile(testFile)
+      const backupPath = await engine.backupFile(testFile)
       expect(backupPath).toBeDefined()
       expect(existsSync(backupPath!)).toBe(true)
       expect(readFileSync(backupPath!, 'utf-8')).toBe('export const x = 42;')
 
-      const purged = engine.purgeExpired()
+      const purged = await engine.purgeExpired()
       expect(purged).toBe(0) // Fresh file not purged
     })
   })
@@ -134,7 +135,7 @@ describe('Sovereign Guard Suite', () => {
 
     it('dynamically scales temperature based on syntactic complexity in agent/request', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         thermalModulator: {
           enabled: true,
           baseTemperature: 0.2,
@@ -148,7 +149,7 @@ describe('Sovereign Guard Suite', () => {
         messages: [
           createUserMessage({ content: [{ type: 'text', text: 'check status' }], source: { kind: 'user' } }),
         ],
-      } as any
+      }
 
       const simpleConfig = await ctx.waterfall(
         'agent/request',
@@ -173,7 +174,7 @@ describe('Sovereign Guard Suite', () => {
             source: { kind: 'user' },
           }),
         ],
-      } as any
+      }
 
       const complexConfig = await ctx.waterfall(
         'agent/request',
@@ -187,34 +188,36 @@ describe('Sovereign Guard Suite', () => {
   describe('Reflexive Auditor (Critic Interceptor)', () => {
     it('audits session every 3 turns and injects guidance without breaking the loop', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         reflexiveAuditor: {
           enabled: true,
           intervalTurns: 3,
         },
       })
 
-      const agent = { id: 'agent-audit-01' } as any
+      const agent = { id: 'agent-audit-01' }
       const mockMessages = [
         createUserMessage({ content: [{ type: 'text', text: 'Step 1: start' }], source: { kind: 'user' } }),
       ]
 
+      type PreStepResult = { kind: string; messages: Array<{ content: Array<{ type?: string; text?: string }> }> }
+
       // Turn 1: no audit notice
-      const t1 = await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages } as any, () => ({ kind: 'enter', messages: mockMessages })) as any
+      const t1 = (await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages }, () => ({ kind: 'enter', messages: mockMessages }))) as PreStepResult
       expect(t1.kind).toBe('enter')
       if (t1.kind === 'enter') expect(t1.messages.length).toBe(1)
 
       // Turn 2: no audit notice
-      const t2 = await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages } as any, () => ({ kind: 'enter', messages: mockMessages })) as any
+      const t2 = (await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages }, () => ({ kind: 'enter', messages: mockMessages }))) as PreStepResult
       expect(t2.kind).toBe('enter')
       if (t2.kind === 'enter') expect(t2.messages.length).toBe(1)
 
       // Turn 3: triggers audit
-      const t3 = await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages } as any, () => ({ kind: 'enter', messages: mockMessages })) as any
+      const t3 = (await ctx.waterfall('agent/pre-step', { agent, messages: mockMessages }, () => ({ kind: 'enter', messages: mockMessages }))) as PreStepResult
       expect(t3.kind).toBe('enter')
       if (t3.kind === 'enter') {
         expect(t3.messages.length).toBe(2)
-        const auditBlock = t3.messages[1]?.content[0] as any
+        const auditBlock = t3.messages[1]?.content[0]
         expect(auditBlock?.text || '').toContain('REFLEXIVE AUDITOR - Turn 3')
       }
     })

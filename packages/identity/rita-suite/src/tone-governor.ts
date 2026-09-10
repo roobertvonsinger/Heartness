@@ -92,7 +92,8 @@ export function registerToneGovernor(ctx: Context, config: ToneGovernorConfig = 
     })
   }
 
-  ctx.on('agent/response' as never, (response: unknown) => {
+  const eventHost = ctx as { on: (event: string, listener: (response: unknown) => void) => void }
+  eventHost.on('agent/response', (response: unknown) => {
     if (response && typeof response === 'object' && 'text' in response) {
       const resp = response as { text: string }
       if (typeof resp.text === 'string') {

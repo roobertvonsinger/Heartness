@@ -17,20 +17,23 @@ import {
 } from '../packages/guard/sovereign-guard/src/index.ts'
 
 // Cargar agente soberano RITA como única fuente de verdad
-const rita = loadSovereignAgent('rita')
-
+let rita: Awaited<ReturnType<typeof loadSovereignAgent>>
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY || ''
 const CARTESIA_KEY = process.env.CARTESIA_API_KEY || process.env.CARTESIA_API_KEY || ''
-const CARTESIA_VOICE_ID = process.env.CARTESIA_VOICE_ID || rita.voice.voiceId
+let CARTESIA_VOICE_ID: string
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
 }
 
-const conversationHistory: ChatMessage[] = [
-  { role: 'system', content: rita.soulMarkdown },
-]
+let conversationHistory: ChatMessage[] = []
+
+async function init() {
+  rita = await loadSovereignAgent('rita')
+  CARTESIA_VOICE_ID = process.env.CARTESIA_VOICE_ID || rita.voice.voiceId
+  conversationHistory = [{ role: 'system', content: rita.soulMarkdown }]
+}
 
 /**
  * Extrae la siguiente unidad fonética/oración completa de un buffer de texto acumulativo.
@@ -433,4 +436,4 @@ async function startLiveChat() {
   promptUser()
 }
 
-startLiveChat().catch(console.error)
+init().then(() => startLiveChat().catch(console.error)).catch(console.error)

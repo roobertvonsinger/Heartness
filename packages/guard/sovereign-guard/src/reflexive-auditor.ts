@@ -21,12 +21,13 @@ export function registerReflexiveAuditor(ctx: Context, config: ReflexiveAuditorC
   const maxAudits = config.maxAuditsPerSession ?? 20
   const agentStates = new WeakMap<object, AgentAuditState>()
 
-  ctx.on('agent/pre-step', async (payload: any, next: any): Promise<PreStepDecision> => {
-    const agent = payload?.agent
+  ctx.on('agent/pre-step', async (payload: unknown, next?: () => Promise<PreStepDecision> | PreStepDecision): Promise<PreStepDecision> => {
+    const p = payload as { agent?: object; messages?: Extract<PreStepDecision, { kind: 'enter' }>['messages'] } | undefined
+    const agent = p?.agent
     const nextRes = typeof next === 'function' ? await next() : null
-    const downstream: PreStepDecision = nextRes ?? { kind: 'enter', messages: payload?.messages ?? [] }
+    const downstream: PreStepDecision = nextRes ?? { kind: 'enter', messages: p?.messages ?? [] }
 
-    if (!downstream || downstream.kind !== 'enter' || !agent) return downstream ?? { kind: 'enter', messages: payload?.messages ?? [] }
+    if (!downstream || downstream.kind !== 'enter' || !agent) return downstream ?? { kind: 'enter', messages: p?.messages ?? [] }
 
     let state = agentStates.get(agent)
     if (!state) {

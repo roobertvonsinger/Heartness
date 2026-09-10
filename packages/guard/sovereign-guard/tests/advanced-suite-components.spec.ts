@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import * as SovereignGuard from '../src/index.ts'
 import { evaluateToolSafety } from '../src/decision-interceptor.ts'
 import { RozRecycleEngine } from '../src/roz-engine.ts'
@@ -36,15 +35,16 @@ describe('Advanced Sovereign Guard Suite (Components 3, 4, 5, 6)', () => {
 
   // ── 2. Versioned Roz Engine ──────────────────────────────────────────────────
   describe('Versioned Roz Engine with Parent Checksum Tracking', () => {
-    it('creates versioned snapshots, tracks parent checksums and enables rollback', () => {
+    it('creates versioned snapshots, tracks parent checksums and enables rollback', async () => {
       const tempStaging = join(tmpdir(), 'dsh-test-versioned-roz-' + Date.now())
       const engine = new RozRecycleEngine(tempStaging, 48, true, 20)
+      await engine.init()
 
       const targetFile = join(tempStaging, 'app.ts')
       writeFileSync(targetFile, 'export const version = 1;')
 
       // Version 1
-      const v1 = engine.createFileVersion(targetFile, 'dev-1')
+      const v1 = await engine.createFileVersion(targetFile, 'dev-1')
       expect(v1).toBeDefined()
       expect(v1?.checksum).toBeDefined()
       expect(v1?.parentChecksum).toBeUndefined()
@@ -52,17 +52,17 @@ describe('Advanced Sovereign Guard Suite (Components 3, 4, 5, 6)', () => {
 
       // Version 2 (mutated)
       writeFileSync(targetFile, 'export const version = 2;\nexport const name = "DeepSick Hardness";')
-      const v2 = engine.createFileVersion(targetFile, 'dev-2')
+      const v2 = await engine.createFileVersion(targetFile, 'dev-2')
       expect(v2).toBeDefined()
       expect(v2?.parentChecksum).toBe(v1?.checksum)
       expect(v2?.diffSummary).toContain('Diff: +1 lines')
 
       // List versions
-      const history = engine.listFileVersions(targetFile)
+      const history = await engine.listFileVersions(targetFile)
       expect(history.length).toBe(2)
 
       // Rollback to version 1
-      const rolledBack = engine.rollbackFileVersion(targetFile, v1!.versionId)
+      const rolledBack = await engine.rollbackFileVersion(targetFile, v1!.versionId)
       expect(rolledBack).toBe(true)
       expect(readFileSync(targetFile, 'utf-8')).toBe('export const version = 1;')
 
@@ -74,7 +74,7 @@ describe('Advanced Sovereign Guard Suite (Components 3, 4, 5, 6)', () => {
   describe('Adaptive Thermal Modulator Error Feedback', () => {
     it('drops temperature to deterministic debug mode on recent error history', async () => {
       const ctx = new Context()
-      SovereignGuard.apply(ctx, {
+      await SovereignGuard.apply(ctx, {
         thermalModulator: {
           enabled: true,
           baseTemperature: 0.2,
@@ -88,7 +88,7 @@ describe('Advanced Sovereign Guard Suite (Components 3, 4, 5, 6)', () => {
         messages: [
           { role: 'tool', content: [{ type: 'text', text: 'Error: AssertionError received in test suite' }] },
         ],
-      } as any
+      }
 
       const config = await ctx.waterfall(
         'agent/request',

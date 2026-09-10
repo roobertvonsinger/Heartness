@@ -18,8 +18,10 @@ interface SchemaNode {
   meta?: { role?: unknown }
   /** `object` properties, keyed by property name. */
   dict?: Record<string, SchemaNode>
-  /** `dict`/`array` element schema. */
+  /** `dict`/`array`/`transform` element schema. */
   inner?: SchemaNode
+  /** `union`/`intersect`/`tuple` element schemas. */
+  list?: SchemaNode[]
 }
 
 /** One schema-declared secret position inside a redacted value. */
@@ -45,6 +47,15 @@ export interface RedactedValue {
 /** Whether a value is a plain data object the walker may recurse into. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasSecret(node: SchemaNode | undefined): boolean {
+  if (!node) return false
+  if (node.meta?.role === 'secret') return true
+  if (node.inner && hasSecret(node.inner)) return true
+  if (node.dict && Object.values(node.dict).some(hasSecret)) return true
+  if (node.list && node.list.some(hasSecret)) return true
+  return false
 }
 
 function walk(node: SchemaNode | undefined, value: unknown, path: string[], secrets: RedactedSecret[]): unknown {
@@ -83,10 +94,34 @@ function walk(node: SchemaNode | undefined, value: unknown, path: string[], secr
       if (!Array.isArray(value)) return value
       return value.map((entry, index) => walk(node.inner, entry, [...path, String(index)], secrets))
     }
+    case 'union':
+    case 'intersect': {
+      if (!node.list || node.list.length === 0) return value
+      let currentVal = value
+      for (const branch of node.list) {
+        const stripped = walk(branch, currentVal, path, secrets)
+        if (stripped !== undefined) {
+          currentVal = stripped
+        }
+      }
+      return currentVal
+    }
+    case 'transform': {
+      return walk(node.inner, value, path, secrets)
+    }
+    case 'tuple': {
+      if (!Array.isArray(value)) return value
+      const list = node.list ?? []
+      return value.map((entry, index) => {
+        const itemSchema = list[index] ?? node.inner
+        return walk(itemSchema, entry, [...path, String(index)], secrets)
+      })
+    }
     default:
-      // TODO(settings-wire-redaction): Fail closed instead — a secret reachable
-      // only through a union, intersection, or transform is returned verbatim
-      // here, with nothing recording that it was missed.
+      if (hasSecret(node)) {
+        secrets.push({ path, set: value !== undefined })
+        return undefined
+      }
       return value
   }
 }

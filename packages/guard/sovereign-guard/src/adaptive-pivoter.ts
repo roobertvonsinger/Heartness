@@ -128,10 +128,11 @@ export class AdaptivePivoterEngine {
 export function registerAdaptivePivoter(ctx: Context, maxRetries = 2): AdaptivePivoterEngine {
   const engine = new AdaptivePivoterEngine(maxRetries)
 
-  ctx.on('agent/tool-error' as any, async (payload: any) => {
-    const toolName = payload?.toolName || payload?.name || 'unknown'
-    const args = payload?.args || {}
-    const error = payload?.error || 'Unknown execution error'
+  ctx.on('agent/tool-error', async (payload: unknown) => {
+    const p = payload as { toolName?: string; name?: string; args?: Record<string, unknown>; error?: string } | undefined
+    const toolName = p?.toolName || p?.name || 'unknown'
+    const args = p?.args || {}
+    const error = p?.error || 'Unknown execution error'
 
     const decision = engine.recordFailure(toolName, args, error)
     if (decision.action === 'PIVOT') {
@@ -140,9 +141,10 @@ export function registerAdaptivePivoter(ctx: Context, maxRetries = 2): AdaptiveP
     }
   })
 
-  ctx.on('agent/tool-success' as any, async (payload: any) => {
-    const toolName = payload?.toolName || payload?.name || 'unknown'
-    const args = payload?.args || {}
+  ctx.on('agent/tool-success', async (payload: unknown) => {
+    const p = payload as { toolName?: string; name?: string; args?: Record<string, unknown> } | undefined
+    const toolName = p?.toolName || p?.name || 'unknown'
+    const args = p?.args || {}
     engine.recordSuccess(toolName, args)
   })
 

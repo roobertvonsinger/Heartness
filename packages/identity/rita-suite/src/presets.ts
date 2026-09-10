@@ -59,8 +59,13 @@ export const RITA_PRESETS: Record<string, RitaPresetDefinition> = {
 }
 
 export function resolveRitaPreset(presetId?: string): RitaPresetDefinition {
-  if (presetId && RITA_PRESETS[presetId]) {
-    return RITA_PRESETS[presetId]!
+  if (presetId && presetId in RITA_PRESETS) {
+    const preset = RITA_PRESETS[presetId]
+    if (preset) return preset
   }
-  return RITA_PRESETS['rita-default']!
+  const defaultPreset = RITA_PRESETS['rita-default']
+  if (!defaultPreset) {
+    throw new Error('Default preset "rita-default" is not defined')
+  }
+  return defaultPreset
 }

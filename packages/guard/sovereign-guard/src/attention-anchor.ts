@@ -136,20 +136,41 @@ export class AttentionLedger {
   }
 }
 
-export const globalAttentionLedger = new AttentionLedger()
+const sessionLedgers = new Map<string, AttentionLedger>()
+
+export function getAttentionLedger(sessionId = 'default'): AttentionLedger {
+  let ledger = sessionLedgers.get(sessionId)
+  if (!ledger) {
+    ledger = new AttentionLedger()
+    sessionLedgers.set(sessionId, ledger)
+  }
+  return ledger
+}
+
+export function clearAttentionLedger(sessionId: string): void {
+  sessionLedgers.delete(sessionId)
+}
+
+export const globalAttentionLedger = getAttentionLedger('default')
 
 /**
  * Registra el Ancla de Atención en Cordis.
  */
 interface AttentionPreStepPayload {
+  sessionId?: string
   messages?: Array<{ role?: string; content?: string }>
 }
 
 interface AttentionToolResultPayload {
+  sessionId?: string
   name?: string
   toolName?: string
   args?: { todos?: TaskItem[] }
   arguments?: { todos?: TaskItem[] }
+}
+
+interface SessionEndPayload {
+  sessionId?: string
 }
 
 /**
@@ -159,14 +180,17 @@ export function registerAttentionAnchor(ctx: Context, config: AttentionAnchorCon
   if (config.enabled === false) return
 
   ctx.on('agent/pre-step', (payload: unknown) => {
-    globalAttentionLedger.incrementTurn()
+    const p = payload as AttentionPreStepPayload | undefined
+    const sessionId = p?.sessionId || 'default'
+    const ledger = getAttentionLedger(sessionId)
+
+    ledger.incrementTurn()
 
     if (config.injectLedgerHeader === false) return
 
-    const p = payload as AttentionPreStepPayload | undefined
     const messages = p?.messages ?? []
     const systemMsg = messages.find(m => m.role === 'system')
-    const header = globalAttentionLedger.renderAnchorHeader()
+    const header = ledger.renderAnchorHeader()
 
     if (systemMsg && typeof systemMsg.content === 'string') {
       if (!systemMsg.content.includes('[⚓ ATTENTION ANCHOR')) {
@@ -181,12 +205,21 @@ export function registerAttentionAnchor(ctx: Context, config: AttentionAnchorCon
   // Sincronizar automáticamente eventos del tool todo_write con el AttentionLedger
   ctx.on('tool/result', (payload: unknown) => {
     const p = payload as AttentionToolResultPayload | undefined
+    const sessionId = p?.sessionId || 'default'
     const toolName = p?.name || p?.toolName
     if (toolName === 'todo_write') {
       const todos = p?.args?.todos || p?.arguments?.todos
       if (Array.isArray(todos)) {
-        globalAttentionLedger.setTasks(todos)
+        getAttentionLedger(sessionId).setTasks(todos)
       }
+    }
+  })
+
+  // Limpiar ledger al finalizar la sesión
+  ctx.on('session/end', (payload: unknown) => {
+    const p = payload as SessionEndPayload | undefined
+    if (p?.sessionId) {
+      clearAttentionLedger(p.sessionId)
     }
   })
 }

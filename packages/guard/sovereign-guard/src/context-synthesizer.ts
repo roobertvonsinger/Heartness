@@ -163,14 +163,14 @@ export async function synthesizeRawOutput(
 export function registerContextSynthesizer(ctx: Context, config: ContextSynthesizerConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('tool/after-call' as any, async (payload: any) => {
+  ctx.on('tool/after-call', async (payload) => {
     if (!payload || !payload.result) return
 
     const raw = typeof payload.result === 'string' ? payload.result : JSON.stringify(payload.result)
     const threshold = config.maxRawCharsThreshold ?? 1500
 
     if (raw.length > threshold) {
-      const synthesized = await synthesizeRawOutput(raw, payload.name || 'unknown_tool', config)
+      const synthesized = await synthesizeRawOutput(raw, (payload as { name?: string }).name || 'unknown_tool', config)
       payload.result = synthesized.digest
       payload._synthesized = true
       payload._reductionPercent = synthesized.reductionPercent

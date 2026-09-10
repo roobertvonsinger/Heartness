@@ -379,20 +379,29 @@ export function extractDualTrackPayload(
   }
 }
 
+interface VoiceGatewayContext {
+  emit(event: string, payload?: unknown): void
+  on(event: 'user/mid-turn-input', listener: (event: { sessionId?: string }) => void): void
+  on(event: 'agent/pre-response', listener: (payload: { content?: unknown; sessionId?: string; speechPayload?: unknown }) => Promise<void> | void): void
+}
+
 export function interruptActiveSpeech(ctx?: Context, sessionId?: string): void {
   if (ctx) {
-    ctx.emit('voice/interrupt' as never, { sessionId, timestamp: Date.now() })
+    const emitter = ctx as unknown as { emit: (event: string, payload: unknown) => void }
+    emitter.emit('voice/interrupt', { sessionId, timestamp: Date.now() })
   }
 }
 
 export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('user/mid-turn-input' as never, (event: { sessionId?: string }) => {
+  const eventCtx = ctx as unknown as VoiceGatewayContext
+
+  eventCtx.on('user/mid-turn-input', (event) => {
     interruptActiveSpeech(ctx, event?.sessionId)
   })
 
-  ctx.on('agent/pre-response' as never, async (payload: { content?: unknown; sessionId?: string; speechPayload?: unknown }) => {
+  eventCtx.on('agent/pre-response', async (payload) => {
     if (!payload || typeof payload.content !== 'string') return
 
     const dualTrack = extractDualTrackPayload(payload.content, config, payload.sessionId)
@@ -406,6 +415,6 @@ export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig 
       profile: dualTrack.ttsProfile,
     }
 
-    ctx.emit('voice/speech-ready' as never, payload.speechPayload)
+    eventCtx.emit('voice/speech-ready', payload.speechPayload)
   })
 }

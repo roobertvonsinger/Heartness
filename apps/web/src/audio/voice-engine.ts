@@ -31,9 +31,9 @@ export class VoiceEngine {
   private activeAudioSources = new Set<AudioBufferSourceNode>()
   private scheduledAudioEndTime = 0
 
-  private onStateChange?: (state: VoiceState) => void
-  private onRmsLevel?: (level: number) => void
-  private onError?: (err: Error) => void
+  private onStateChange?: ((state: VoiceState) => void) | undefined
+  private onRmsLevel?: ((level: number) => void) | undefined
+  private onError?: ((err: Error) => void) | undefined
   private reconnectTimer: number | null = null
 
   constructor(config: VoiceEngineConfig = {}) {
@@ -239,7 +239,8 @@ export class VoiceEngine {
       // Calculate RMS energy (VAD level 0.0 - 1.0)
       let sum = 0
       for (let i = 0; i < inputData.length; i++) {
-        sum += inputData[i]! * inputData[i]!
+        const val = inputData[i] ?? 0
+        sum += val * val
       }
       const rms = Math.sqrt(sum / inputData.length)
       const normalizedRms = Math.min(1, rms * 5)
@@ -258,7 +259,8 @@ export class VoiceEngine {
 
     const int16 = new Int16Array(float32Data.length)
     for (let i = 0; i < float32Data.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32Data[i]!))
+      const val = float32Data[i] ?? 0
+      const s = Math.max(-1, Math.min(1, val))
       int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
     }
 
@@ -267,7 +269,7 @@ export class VoiceEngine {
     const bytes = new Uint8Array(int16.buffer)
     const len = bytes.byteLength
     for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]!)
+      binary += String.fromCharCode(bytes[i] ?? 0)
     }
     const b64 = btoa(binary)
 
@@ -309,7 +311,7 @@ export class VoiceEngine {
       const buffer = ctx.createBuffer(1, int16.length, 24000)
       const channelData = buffer.getChannelData(0)
       for (let i = 0; i < int16.length; i++) {
-        channelData[i] = int16[i]! / 32768.0
+        channelData[i] = (int16[i] ?? 0) / 32768.0
       }
 
       // Schedule gapless streaming playback

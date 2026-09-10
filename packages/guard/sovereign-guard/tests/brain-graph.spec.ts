@@ -9,13 +9,13 @@ describe('BrainGraph Suite (Dynamic Semantic Memory & Hebbian Learning)', () => 
   const testDbPath = path.join(testDbDir, 'test_brain_graph.db')
   let graph: BrainGraph
 
-  beforeAll(() => {
+  beforeAll(async () => {
     if (fs.existsSync(testDbPath)) {
       try {
         fs.unlinkSync(testDbPath)
       } catch {}
     }
-    graph = new BrainGraph({ dbPath: testDbPath, walMode: false, decayHalfLifeDays: 14, minPruneWeight: 0.20 })
+    graph = await BrainGraph.create({ dbPath: testDbPath, walMode: false, decayHalfLifeDays: 14, minPruneWeight: 0.20 })
   })
 
   afterAll(() => {
@@ -158,7 +158,7 @@ describe('BrainGraph Suite (Dynamic Semantic Memory & Hebbian Learning)', () => 
     }
 
     const { registerBrainGraph } = await import('../src/brain-graph.ts')
-    registerBrainGraph(mockCtx as never, { dbPath: testDbPath, walMode: false })
+    await registerBrainGraph(mockCtx as never, { dbPath: testDbPath, walMode: false })
 
     const payload = {
       messages: [

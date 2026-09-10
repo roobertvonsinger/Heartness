@@ -206,30 +206,41 @@ export type {
   SessionContinuityConfig,
 } from './session-continuity.ts'
 
-export function apply(ctx: Context, config: SovereignGuardConfig = {}): void {
+async function safeBoot(name: string, fn: () => Promise<unknown>, ctx?: Context): Promise<void> {
+  try {
+    await fn()
+  } catch (err) {
+    ctx?.logger?.warn?.(`[SovereignGuard] SafeBoot: non-critical guard ${name} failed to register: ${String(err)}`)
+  }
+}
+
+export async function apply(ctx: Context, config: SovereignGuardConfig = {}): Promise<void> {
+  // Nivel 1: Guards Core Innegociables
   registerContextIsolator(ctx, config.contextIsolator ?? {})
   registerSpillGuard(ctx, config.spillGuard ?? {})
   registerDecisionInterceptor(ctx, config.decisionInterceptor ?? {})
-  registerRozEngine(ctx, config.rozEngine ?? {})
-  registerThermalModulator(ctx, config.thermalModulator ?? {})
-  registerReflexiveAuditor(ctx, config.reflexiveAuditor ?? {})
-  registerAntigravityOptimizer(ctx, config.optimizer ?? {})
-  registerHarnessTelemetry(ctx, config.telemetry ?? {})
-  registerQualityAuditor(ctx, config.qualityAuditor ?? {})
-  registerKeepAliveGateway(ctx, config.keepAlive ?? {})
-  registerStepFeedback(ctx, config.stepFeedback ?? {})
-  registerToneGovernor(ctx, config.toneGovernor ?? {})
-  registerContextSynthesizer(ctx, config.synthesizer ?? {})
-  registerGraphifyCartographer(ctx, config.graphify ?? {})
-  registerIntentRadar(ctx, config.intentRadar ?? {})
-  registerAttentionAnchor(ctx, config.attentionAnchor ?? {})
-  registerExecutiveCognition(ctx, config.executiveCognition ?? {})
-  registerVoiceGateway(ctx, config.voiceGateway ?? {})
-  registerVoiceGuard(ctx, config.voiceGuard ?? {})
-  registerReflexiveLearner(ctx, config.reflexiveLearner ?? {})
-  registerHTCCalibrator(ctx, config.htcCalibrator ?? {})
-  registerBrainGraph(ctx, config.brainGraph ?? {})
-  registerOpenDesign(ctx, config.openDesign ?? {})
-  registerAdaptivePivoter(ctx, config.adaptivePivoter?.maxRetries ?? 2)
-  registerProgressStreamRelay(ctx, config.progressStream ?? {})
+  await registerRozEngine(ctx, config.rozEngine ?? {})
+
+  // Nivel 2: Módulos Periféricos & Experimentales (SafeBoot: Fallo aislado sin romper arranque)
+  await safeBoot('thermalModulator', () => Promise.resolve(registerThermalModulator(ctx, config.thermalModulator ?? {})), ctx)
+  await safeBoot('reflexiveAuditor', () => Promise.resolve(registerReflexiveAuditor(ctx, config.reflexiveAuditor ?? {})), ctx)
+  await safeBoot('optimizer', () => Promise.resolve(registerAntigravityOptimizer(ctx, config.optimizer ?? {})), ctx)
+  await safeBoot('telemetry', () => Promise.resolve(registerHarnessTelemetry(ctx, config.telemetry ?? {})), ctx)
+  await safeBoot('qualityAuditor', () => Promise.resolve(registerQualityAuditor(ctx, config.qualityAuditor ?? {})), ctx)
+  await safeBoot('keepAlive', () => Promise.resolve(registerKeepAliveGateway(ctx, config.keepAlive ?? {})), ctx)
+  await safeBoot('stepFeedback', () => Promise.resolve(registerStepFeedback(ctx, config.stepFeedback ?? {})), ctx)
+  await safeBoot('toneGovernor', () => Promise.resolve(registerToneGovernor(ctx, config.toneGovernor ?? {})), ctx)
+  await safeBoot('synthesizer', () => Promise.resolve(registerContextSynthesizer(ctx, config.synthesizer ?? {})), ctx)
+  await safeBoot('graphify', () => Promise.resolve(registerGraphifyCartographer(ctx, config.graphify ?? {})), ctx)
+  await safeBoot('intentRadar', () => Promise.resolve(registerIntentRadar(ctx, config.intentRadar ?? {})), ctx)
+  await safeBoot('attentionAnchor', () => Promise.resolve(registerAttentionAnchor(ctx, config.attentionAnchor ?? {})), ctx)
+  await safeBoot('executiveCognition', () => Promise.resolve(registerExecutiveCognition(ctx, config.executiveCognition ?? {})), ctx)
+  await safeBoot('voiceGateway', () => Promise.resolve(registerVoiceGateway(ctx, config.voiceGateway ?? {})), ctx)
+  await safeBoot('voiceGuard', () => Promise.resolve(registerVoiceGuard(ctx, config.voiceGuard ?? {})), ctx)
+  await safeBoot('reflexiveLearner', () => registerReflexiveLearner(ctx, config.reflexiveLearner ?? {}), ctx)
+  await safeBoot('htcCalibrator', () => Promise.resolve(registerHTCCalibrator(ctx, config.htcCalibrator ?? {})), ctx)
+  await safeBoot('brainGraph', () => registerBrainGraph(ctx, config.brainGraph ?? {}), ctx)
+  await safeBoot('openDesign', () => registerOpenDesign(ctx, config.openDesign ?? {}), ctx)
+  await safeBoot('adaptivePivoter', () => Promise.resolve(registerAdaptivePivoter(ctx, config.adaptivePivoter?.maxRetries ?? 2)), ctx)
+  await safeBoot('progressStream', () => Promise.resolve(registerProgressStreamRelay(ctx, config.progressStream ?? {})), ctx)
 }

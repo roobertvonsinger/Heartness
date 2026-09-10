@@ -133,7 +133,7 @@ describe('Sub-Plan C: WebAudio Earcons & Voice Pipeline', () => {
     it('toggles voice state and notifies server via WS frame', () => {
       const stateChanges: string[] = []
       const engine = new VoiceEngine({
-        onStateChange: (state) => stateChanges.push(state),
+        onStateChange: state => stateChanges.push(state),
       })
 
       engine.setVoiceEnabled(false)
@@ -150,7 +150,7 @@ describe('Sub-Plan C: WebAudio Earcons & Voice Pipeline', () => {
     it('barge-in cuts voice and sends interrupt frame in <10ms', async () => {
       const engine = new VoiceEngine()
       // Simulate incoming speech chunk
-      // @ts-expect-error test hook
+      // @ts-expect-error accessing private method for unit testing
       engine.handleSpeechChunk('AQIDBA==', 'pcm')
 
       const start = performance.now()

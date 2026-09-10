@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFile, access } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type { GraphifyCartographerConfig } from './types.ts'
 
@@ -43,11 +43,33 @@ export interface GodNodeInfo {
 /**
  * Carga el grafo de conocimiento AST local (generado por graphify / .graphify/graph.json).
  */
-export function loadKnowledgeGraph(graphPath = '.graphify/graph.json'): KnowledgeGraph | null {
-  if (!existsSync(graphPath)) return null
+export async function loadKnowledgeGraph(graphPath = '.graphify/graph.json'): Promise<KnowledgeGraph | null> {
+  try {
+    await access(graphPath)
+  } catch {
+    return null
+  }
 
   try {
-    const raw = readFileSync(graphPath, 'utf-8')
+    const raw = await readFile(graphPath, 'utf-8')
+    const parsed = JSON.parse(raw)
+    return {
+      version: parsed.version || '1.0.0',
+      nodes: parsed.nodes || [],
+      edges: parsed.edges || [],
+      godNodes: parsed.godNodes || [],
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Carga el grafo de conocimiento AST local de forma asíncrona sin bloquear el event loop.
+ */
+export async function loadKnowledgeGraphAsync(graphPath = '.graphify/graph.json'): Promise<KnowledgeGraph | null> {
+  try {
+    const raw = await readFile(graphPath, 'utf-8')
     const parsed = JSON.parse(raw)
     return {
       version: parsed.version || '1.0.0',
@@ -133,15 +155,20 @@ export function findDependencyPath(fromNode: string, toNode: string, graph: Know
   const adj = new Map<string, string[]>()
 
   for (const edge of graph.edges) {
-    if (!adj.has(edge.source)) adj.set(edge.source, [])
-    adj.get(edge.source)!.push(edge.target)
+    let list = adj.get(edge.source)
+    if (!list) {
+      list = []
+      adj.set(edge.source, list)
+    }
+    list.push(edge.target)
   }
 
   const queue: string[][] = [[fromNode]]
   const visited = new Set<string>([fromNode])
 
   while (queue.length > 0) {
-    const path = queue.shift()!
+    const path = queue.shift()
+    if (!path) break
     const current = path[path.length - 1]
     if (!current) continue
 
@@ -170,16 +197,17 @@ export function registerGraphifyCartographer(ctx: Context, config: GraphifyCarto
   let activeGraph: KnowledgeGraph | null = null
   const graphPath = config.graphPath ?? '.graphify/graph.json'
 
-  ctx.on('ready' as any, () => {
-    activeGraph = loadKnowledgeGraph(graphPath)
+  ctx.on('ready', async () => {
+    activeGraph = await loadKnowledgeGraphAsync(graphPath)
   })
 
   // Hook para inyectar subgrafos relevantes al planificar o en pre-step
-  ctx.on('agent/pre-step' as any, async (payload: any) => {
+  ctx.on('agent/pre-step', async (payload: unknown) => {
     if (!activeGraph || config.autoInjectSubgraphs === false) return
 
-    const messages = payload?.messages ?? []
-    const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop()
+    const p = payload as { messages?: Array<{ role?: string; content?: unknown }> } | undefined
+    const messages = p?.messages ?? []
+    const lastUserMsg = messages.filter(m => m.role === 'user').pop()
     if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return
 
     const content = lastUserMsg.content

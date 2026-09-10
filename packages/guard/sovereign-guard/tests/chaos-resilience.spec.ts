@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { AdaptivePivoterEngine } from '../src/adaptive-pivoter.ts'
@@ -50,13 +51,13 @@ describe('Chaos & Fault Injection Resilience Suite', () => {
   })
 
   describe('Transactional Brain Adapter Concurrency & Chaos', () => {
-    it('handles concurrent burst writes with BEGIN IMMEDIATE without corruption', () => {
+    it('handles concurrent burst writes with BEGIN IMMEDIATE without corruption', async () => {
       const tmpDir = path.resolve(process.cwd(), 'node_modules', '.tmp-chaos-test')
       if (!fs.existsSync(tmpDir)) {
         fs.mkdirSync(tmpDir, { recursive: true })
       }
       const dbPath = path.join(tmpDir, 'chaos-brain.db')
-      const adapter = new TransactionalBrainAdapter({ dbPath, walMode: true, busyTimeout: 5000 })
+      const adapter = await TransactionalBrainAdapter.create({ dbPath, walMode: true, busyTimeout: 5000 })
 
       const results: boolean[] = []
       for (let i = 0; i < 5; i++) {
@@ -86,13 +87,13 @@ describe('Chaos & Fault Injection Resilience Suite', () => {
       try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
     })
 
-    it('detects and rejects corrupted payloads with checksum mismatch gracefully', () => {
+    it('detects and rejects corrupted payloads with checksum mismatch gracefully', async () => {
       const tmpDir = path.resolve(process.cwd(), 'node_modules', '.tmp-tamper-test')
       if (!fs.existsSync(tmpDir)) {
         fs.mkdirSync(tmpDir, { recursive: true })
       }
       const dbPath = path.join(tmpDir, 'tamper-brain.db')
-      const adapter = new TransactionalBrainAdapter({ dbPath, walMode: true })
+      const adapter = await TransactionalBrainAdapter.create({ dbPath, walMode: true })
 
       const validDelta: SessionDelta = {
         sessionId: 'tamper-session-1',
@@ -108,7 +109,7 @@ describe('Chaos & Fault Injection Resilience Suite', () => {
       adapter.saveDelta(validDelta)
 
       // Tamper with SQLite payload directly (simulating disk corruption or rogue edit)
-      const engine = new SessionDeltaEngine({ dbPath })
+      const engine = await SessionDeltaEngine.create({ dbPath })
       const retrieved = engine.getLatestDelta('tamper-repo')
       expect(retrieved).toBeDefined()
       expect(retrieved?.primaryGoal).toBe('Original Goal')
@@ -120,15 +121,17 @@ describe('Chaos & Fault Injection Resilience Suite', () => {
   })
 
   describe('Warm Start Primer Degraded Mode Resilience', () => {
-    it('gracefully degrades to fresh start when memory is empty without unhandled crashes', () => {
-      const primer = new WarmStartPrimer({ dbPath: 'non-existent-path/brain.db' })
-      const payload = primer.assembleWarmStartPrompt('unknown-repo-xyz')
+    it('gracefully degrades to fresh start when memory is empty without unhandled crashes', async () => {
+      const tempPath = path.join(os.tmpdir(), `non_existent_path_${Date.now()}`, 'brain.db')
+      const primer = await WarmStartPrimer.create({ dbPath: tempPath })
+      const payload = await primer.assembleWarmStartPrompt('unknown-repo-xyz')
 
       expect(payload).toBeDefined()
       expect(['NEXT_SESSION_MD', 'FALLBACK_FRESH']).toContain(payload.source)
       expect(payload.estimatedTokens).toBeLessThan(250)
       expect(payload.integrityVerified).toBe(true)
       primer.close()
+      try { fs.rmSync(path.dirname(tempPath), { recursive: true, force: true }) } catch {}
     })
   })
 

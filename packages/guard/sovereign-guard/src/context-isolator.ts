@@ -35,26 +35,44 @@ export function calculateAdaptiveMultiplier(
   return multiplier
 }
 
-export function registerContextIsolator(ctx: Context, config: ContextIsolatorConfig): void {
+interface IsolatorMessage {
+  role?: string
+  source?: { kind?: string; summary?: string }
+  content?: Array<{ type?: string; text?: string }>
+}
+
+interface AgentPreStepPayload {
+  agent?: {
+    id?: string
+    model?: string
+    options?: { model?: string }
+  }
+  messages?: IsolatorMessage[]
+}
+
+const DEFAULT_RULES: ModelRule[] = []
+
+export function registerContextIsolator(ctx: Context, config: ContextIsolatorConfig = {}): void {
   if (config.enabled === false) return
 
-  const rules: { regex: RegExp; rule: ModelRule }[] = (config.rules ?? []).map(rule => ({
+  const rules: { regex: RegExp; rule: ModelRule }[] = (config.rules ?? DEFAULT_RULES).map(rule => ({
     regex: wildcardToRegExp(rule.pattern),
     rule,
   }))
 
   const adaptiveConfig = config.adaptive ?? {}
   const adaptiveEnabled = adaptiveConfig.enabled !== false
-  const warningThresholds = (adaptiveConfig.warningThresholds ?? [0.5, 0.75, 0.9]).sort((a, b) => b - a)
   const autoSaveToRoz = adaptiveConfig.autoSaveToRoz !== false
+  const warningThresholds = (adaptiveConfig.warningThresholds ?? [0.5, 0.75, 0.9]).slice().sort((a, b) => b - a)
   const complexityWeighting = adaptiveConfig.complexityWeighting !== false
   const stagingDir = adaptiveConfig.stagingDir ?? '_archive/staging/contexts'
 
   const rozEngine = new RozRecycleEngine(stagingDir, 48)
 
-  ctx.on('agent/pre-step', async (payload: any, next: any): Promise<PreStepDecision> => {
-    const agent = payload?.agent
-    const messages = payload?.messages ?? []
+  ctx.on('agent/pre-step', async (payload: unknown, next?: () => Promise<PreStepDecision> | PreStepDecision): Promise<PreStepDecision> => {
+    const p = payload as AgentPreStepPayload | undefined
+    const agent = p?.agent
+    const messages = (p?.messages ?? []) as unknown as Extract<PreStepDecision, { kind: 'enter' }>['messages']
     const model = agent?.options?.model ?? agent?.model ?? ''
     const fallbackNext = (): PreStepDecision => (typeof next === 'function' ? next() : { kind: 'enter', messages })
 
@@ -72,8 +90,8 @@ export function registerContextIsolator(ctx: Context, config: ContextIsolatorCon
     let modified = false
 
     // Calculate current character and turn counts
-    const totalChars = currentMessages.reduce((sum: number, msg: any) => {
-      const textLen = (msg?.content ?? []).reduce((inner: number, block: any) => inner + (block.type === 'text' ? block.text.length : 0), 0)
+    const totalChars = currentMessages.reduce((sum: number, msg: IsolatorMessage) => {
+      const textLen = (msg?.content ?? []).reduce((inner: number, block: { type?: string; text?: string }) => inner + (block.type === 'text' && block.text ? block.text.length : 0), 0)
       return sum + textLen
     }, 0)
     const totalTurns = currentMessages.length
@@ -95,8 +113,8 @@ export function registerContextIsolator(ctx: Context, config: ContextIsolatorCon
     let complexityScore = 0
     if (complexityWeighting) {
       try {
-        const lastUserMsg = currentMessages.slice().reverse().find((m: any) => m?.source?.kind === 'user' || m?.role === 'user')
-        const lastText = (lastUserMsg?.content ?? []).map((b: any) => (b.type === 'text' ? b.text : '')).join(' ')
+        const lastUserMsg = currentMessages.slice().reverse().find((m: IsolatorMessage) => m?.source?.kind === 'user' || m?.role === 'user')
+        const lastText = (lastUserMsg?.content ?? []).map((b: { type?: string; text?: string }) => (b.type === 'text' && b.text ? b.text : '')).join(' ')
         complexityScore = calculateSyntacticWeight(lastText).score
       } catch {
         // best effort
@@ -125,7 +143,7 @@ export function registerContextIsolator(ctx: Context, config: ContextIsolatorCon
 
       let backupPath: string | undefined
       if (autoSaveToRoz) {
-        backupPath = rozEngine.backupContextData(agent?.id || model, omitted)
+        backupPath = await rozEngine.backupContextData(agent?.id || model, omitted)
       }
 
       const noticeText = backupPath
@@ -148,8 +166,8 @@ export function registerContextIsolator(ctx: Context, config: ContextIsolatorCon
 
     // 2. Character budget bounding
     if (effectiveMaxChars) {
-      const currentChars = currentMessages.reduce((sum: number, msg: any) => {
-        const textLen = (msg?.content ?? []).reduce((inner: number, block: any) => inner + (block.type === 'text' ? block.text.length : 0), 0)
+      const currentChars = currentMessages.reduce((sum: number, msg: IsolatorMessage) => {
+        const textLen = (msg?.content ?? []).reduce((inner: number, block: { type?: string; text?: string }) => inner + (block.type === 'text' && block.text ? block.text.length : 0), 0)
         return sum + textLen
       }, 0)
 
@@ -160,7 +178,7 @@ export function registerContextIsolator(ctx: Context, config: ContextIsolatorCon
 
         let backupPath: string | undefined
         if (autoSaveToRoz) {
-          backupPath = rozEngine.backupContextData(agent?.id || model, middle)
+          backupPath = await rozEngine.backupContextData(agent?.id || model, middle)
         }
 
         const noticeText = backupPath
@@ -186,7 +204,7 @@ export function registerContextIsolator(ctx: Context, config: ContextIsolatorCon
     if (!modified && adaptiveEnabled && usageRatio >= 0.5) {
       const activeThreshold = warningThresholds.find(th => usageRatio >= th)
       if (activeThreshold) {
-        const alreadyWarned = currentMessages.some((m: any) => {
+        const alreadyWarned = currentMessages.some((m: IsolatorMessage) => {
           const summary = m?.source?.summary ?? ''
           return summary.includes(`warning-${activeThreshold}`)
         })

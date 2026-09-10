@@ -41,7 +41,7 @@ export function webCardModel(block: ToolCallBlock): WebBlockProps | null {
   if (!('kind' in block)) return null
   const result = block.resultView
   if (result?.card !== 'web') return null
-  if (result.kind === 'search') {
+  if (result?.kind === 'search') {
     return {
       kind: 'search',
       answer: result.answer,
@@ -61,8 +61,7 @@ export function webCardModel(block: ToolCallBlock): WebBlockProps | null {
   // an unknown `card` tag takes above. The static union narrows `kind` to
   // `'fetch'` here, but the runtime value is off the wire, so the guard and its
   // null fallthrough are load-bearing despite the type.
-  // oxlint-disable-next-line typescript/no-unnecessary-condition
-  if (result.kind === 'fetch') {
+  if (result?.kind === 'fetch') {
     return {
       kind: 'fetch',
       url: result.url,

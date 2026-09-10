@@ -141,45 +141,89 @@ export function generateStepPill(
   }
 }
 
+interface SteeringEntry {
+  directive: string
+  timestamp: number
+}
+
 /**
  * Mid-Turn Steering Queue for hot-injecting user feedback during autonomous executions.
+ * Features TTL protection against memory leaks and session lifecycle cleanup.
  */
 export class MidTurnSteeringQueue {
-  private queue = new Map<string, string[]>()
+  private queue = new Map<string, SteeringEntry[]>()
+  private readonly ttlMs: number
+
+  constructor(ttlMs = 10 * 60 * 1000) {
+    this.ttlMs = ttlMs
+  }
+
+  private pruneExpired(sessionId?: string): void {
+    const now = Date.now()
+    if (sessionId) {
+      const list = this.queue.get(sessionId)
+      if (list) {
+        const fresh = list.filter(item => now - item.timestamp < this.ttlMs)
+        if (fresh.length === 0) {
+          this.queue.delete(sessionId)
+        } else {
+          this.queue.set(sessionId, fresh)
+        }
+      }
+    } else {
+      for (const [sid, list] of this.queue.entries()) {
+        const fresh = list.filter(item => now - item.timestamp < this.ttlMs)
+        if (fresh.length === 0) {
+          this.queue.delete(sid)
+        } else {
+          this.queue.set(sid, fresh)
+        }
+      }
+    }
+  }
 
   push(sessionId: string, directive: string): void {
     const clean = directive.trim()
     if (!clean) return
+    this.pruneExpired(sessionId)
     const list = this.queue.get(sessionId) ?? []
-    list.push(clean)
+    list.push({ directive: clean, timestamp: Date.now() })
     this.queue.set(sessionId, list)
   }
 
   popPending(sessionId: string): string[] {
+    this.pruneExpired(sessionId)
     const pending = this.queue.get(sessionId) ?? []
     this.queue.delete(sessionId)
-    return pending
+    return pending.map(e => e.directive)
   }
 
   popNext(sessionId: string): string | undefined {
+    this.pruneExpired(sessionId)
     const q = this.queue.get(sessionId)
     if (!q || q.length === 0) return undefined
     const item = q.shift()
     if (q.length === 0) {
       this.queue.delete(sessionId)
     }
-    return item
+    return item?.directive
   }
 
   peekAll(sessionId: string): string[] {
-    return this.queue.get(sessionId) ?? []
+    this.pruneExpired(sessionId)
+    return (this.queue.get(sessionId) ?? []).map(e => e.directive)
   }
 
   clear(sessionId: string): void {
     this.queue.delete(sessionId)
   }
 
+  clearAll(): void {
+    this.queue.clear()
+  }
+
   hasPending(sessionId: string): boolean {
+    this.pruneExpired(sessionId)
     const list = this.queue.get(sessionId)
     return Boolean(list && list.length > 0)
   }
@@ -208,12 +252,41 @@ export class MidTurnSteeringQueue {
   }
 }
 
+/** @deprecated Use getSteeringQueue(sessionId) instead. Retained for backward compatibility with v1 callers. */
 export const globalSteeringQueue = new MidTurnSteeringQueue()
+
+const steeringQueues = new Map<string, MidTurnSteeringQueue>()
+
+/**
+ * Factory: retrieves or creates a session-scoped MidTurnSteeringQueue.
+ * Mirrors the AttentionLedger pattern to eliminate global singleton state.
+ */
+export function getSteeringQueue(sessionId = 'default'): MidTurnSteeringQueue {
+  let queue = steeringQueues.get(sessionId)
+  if (!queue) {
+    queue = new MidTurnSteeringQueue()
+    steeringQueues.set(sessionId, queue)
+  }
+  return queue
+}
+
+/**
+ * Cleans up the steering queue for a session that has ended.
+ */
+export function clearSteeringQueue(sessionId: string): void {
+  steeringQueues.delete(sessionId)
+}
 
 /**
  * Registers the Step Feedback and Mid-Turn Steering into Cordis context.
  */
-export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = {}): void {
+export function registerStepFeedback(
+  ctx: Context,
+  config: StepFeedbackConfig = {},
+  queue: MidTurnSteeringQueue | null = null,
+): void {
+  // Default to session-scoped factory instead of global singleton
+  const effectiveQueue = queue ?? getSteeringQueue('default')
   if (config.enabled === false) return
 
   // Hook tool execution lifecycle to dispatch orientative pills
@@ -227,7 +300,7 @@ export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = 
     if (ev.args && typeof ev.args === 'object') {
       const targetId = (ev.args.nodeId || ev.args.targetId || ev.args.node || (ev.args.target as string))
       if (typeof targetId === 'string' && targetId.trim()) {
-        ctx.emit('canvas/bring-to-view' as never, {
+        ctx.emit('canvas/bring-to-view', {
           targetId: targetId.trim(),
           label: targetId.trim(),
           timestamp: Date.now(),
@@ -252,27 +325,42 @@ export function registerStepFeedback(ctx: Context, config: StepFeedbackConfig = 
       const dir = (ev.directive || ev.text)?.trim()
       const sid = ev.sessionId || 'default'
       if (dir) {
-        globalSteeringQueue.push(sid, dir)
-        ctx.emit('steering/queued' as never, { sessionId: sid, directive: dir })
+        effectiveQueue.push(sid, dir)
+        ctx.emit('steering/queued', { sessionId: sid, directive: dir })
       }
     }
   })
 
   // Hook agent/pre-step to inject pending mid-turn steering directives into active conversation without restart
-  ctx.on('agent/pre-step' as never, async (payload: any) => {
-    const sessionId = payload?.agent?.sessionId || payload?.sessionId || 'default'
-    if (globalSteeringQueue.hasPending(sessionId)) {
-      const injection = globalSteeringQueue.consumeFormattedContext(sessionId)
+  ctx.on('agent/pre-step', async (payload: unknown) => {
+    const p = payload as {
+      agent?: { sessionId?: string }
+      sessionId?: string
+      messages?: Array<{ role: string; content: string; metadata?: Record<string, unknown> }>
+    } | undefined
+    const sessionId = p?.agent?.sessionId || p?.sessionId || 'default'
+    if (effectiveQueue.hasPending(sessionId)) {
+      const injection = effectiveQueue.consumeFormattedContext(sessionId)
       if (injection) {
-        if (payload?.messages && Array.isArray(payload.messages)) {
-          payload.messages.push({
+        if (p?.messages && Array.isArray(p.messages)) {
+          p.messages.push({
             role: 'user',
             content: injection,
             metadata: { isMidTurnSteering: true, timestamp: Date.now() },
           })
         }
-        ctx.emit('steering/injected' as never, { sessionId, injection })
+        ctx.emit('steering/injected', { sessionId, injection })
       }
+    }
+  })
+
+  // Hook session/end to clean up steering queue for the terminating session
+  ctx.on('session/end', (event: unknown) => {
+    const ev = event as { sessionId?: string } | undefined
+    const sid = ev?.sessionId
+    if (sid) {
+      effectiveQueue.clear(sid)
+      clearSteeringQueue(sid)
     }
   })
 }

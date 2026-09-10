@@ -94,9 +94,10 @@ export function synthesizeExecutivePlan(
 export function registerExecutiveCognition(ctx: Context, config: ExecutiveCognitionConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('agent/pre-step' as any, async (payload: any) => {
-    const messages = payload?.messages ?? []
-    const systemMsg = messages.find((m: any) => m.role === 'system')
+  ctx.on('agent/pre-step', async (payload: unknown) => {
+    const p = payload as { messages?: Array<{ role?: string; content?: unknown }> } | undefined
+    const messages = p?.messages ?? []
+    const systemMsg = messages.find(m => m.role === 'system')
 
     if (systemMsg && typeof systemMsg.content === 'string') {
       systemMsg.content = injectExecutiveDirectives(systemMsg.content, config)

@@ -1,10 +1,10 @@
 import { loadSovereignAgent } from '../packages/guard/sovereign-guard/src/index.ts'
 
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || ''
-const rita = loadSovereignAgent('rita')
 
 async function runRitaAudit() {
   console.log('⚡ Consultando a RITA directamente en DSH...')
+  const rita = await loadSovereignAgent('rita')
 
   const systemPrompt = `${rita.soulMarkdown}
 

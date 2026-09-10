@@ -504,7 +504,7 @@ export function extractDualTrackPayload(
  */
 export function interruptActiveSpeech(ctx?: Context, sessionId?: string): void {
   if (ctx) {
-    ctx.emit('voice/interrupt' as never, { sessionId, timestamp: Date.now() })
+    ctx.emit('voice/interrupt', { sessionId, timestamp: Date.now() })
   }
 }
 
@@ -515,29 +515,34 @@ export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig 
   if (config.enabled === false) return
 
   // Listen to mid-turn user inputs to interrupt running voice synthesis immediately
-  ctx.on('user/mid-turn-input' as never, (event: { sessionId?: string }) => {
+  ctx.on('user/mid-turn-input', (event: { sessionId?: string }) => {
     interruptActiveSpeech(ctx, event?.sessionId)
   })
 
-  ctx.on('agent/pre-response' as never, async (payload: { content?: unknown; sessionId?: string; speechPayload?: unknown }) => {
+  ctx.on('agent/pre-response', async (payload: { content?: unknown; sessionId?: string; speechPayload?: unknown }) => {
     if (!payload || typeof payload.content !== 'string') return
 
-    const dualTrack = extractDualTrackPayload(payload.content, config, payload.sessionId)
-    payload.content = dualTrack.writtenText
-    payload.speechPayload = {
-      text: dualTrack.speechText,
-      provider: dualTrack.provider,
-      modifiers: dualTrack.modifiers,
-      cartesiaPayload: dualTrack.cartesiaPayload,
-      elevenlabsPayload: dualTrack.elevenlabsPayload,
-      profile: dualTrack.ttsProfile,
-      bringToView: dualTrack.bringToView,
-    }
+    try {
+      const dualTrack = extractDualTrackPayload(payload.content, config, payload.sessionId)
+      payload.content = dualTrack.writtenText
+      payload.speechPayload = {
+        text: dualTrack.speechText,
+        provider: dualTrack.provider,
+        modifiers: dualTrack.modifiers,
+        cartesiaPayload: dualTrack.cartesiaPayload,
+        elevenlabsPayload: dualTrack.elevenlabsPayload,
+        profile: dualTrack.ttsProfile,
+        bringToView: dualTrack.bringToView,
+      }
 
-    if (dualTrack.bringToView) {
-      ctx.emit('canvas/bring-to-view' as never, dualTrack.bringToView)
-    }
+      if (dualTrack.bringToView) {
+        ctx.emit('canvas/bring-to-view', dualTrack.bringToView)
+      }
 
-    ctx.emit('voice/speech-ready' as never, payload.speechPayload)
+      ctx.emit('voice/speech-ready', { speechPayload: payload.speechPayload as Record<string, unknown> | undefined })
+    } catch (err) {
+      // Fail-open: voice degradation must never disrupt textual response
+      ctx.logger?.warn?.(`[VoiceGateway] Pre-response synthesis bypass: ${String(err)}`)
+    }
   })
 }

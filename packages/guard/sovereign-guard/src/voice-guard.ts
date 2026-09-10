@@ -19,15 +19,17 @@ export interface CachedAudioEntry {
   format: string
   createdAt: number
   hitCount: number
+  /** Timestamp of last access for real LRU eviction. */
+  lastUsed: number
 }
 
 /**
  * Caché de audio deduplicada en memoria para status pills y frases recurrentes.
+ * Implements real LRU eviction (not FIFO) using explicit lastUsed timestamps.
  */
 export class VoiceAudioCache {
   private cache = new Map<string, CachedAudioEntry>()
   private readonly maxEntries: number
-
   constructor(maxEntries = 100) {
     this.maxEntries = maxEntries
   }
@@ -41,14 +43,22 @@ export class VoiceAudioCache {
     const entry = this.cache.get(key)
     if (entry) {
       entry.hitCount++
+      entry.lastUsed = Date.now()
     }
     return entry
   }
 
   set(key: string, buffer: Buffer, format = 'mp3'): void {
-    if (this.cache.size >= this.maxEntries) {
-      // Eliminar la entrada con menos hits (LFU/LRU)
-      const oldestKey = this.cache.keys().next().value
+    // Evict LRU entry when at capacity — real LRU based on lastUsed timestamp
+    if (this.cache.size >= this.maxEntries && !this.cache.has(key)) {
+      let oldestKey: string | undefined
+      let oldestTime = Infinity
+      for (const [k, v] of this.cache.entries()) {
+        if (v.lastUsed < oldestTime) {
+          oldestTime = v.lastUsed
+          oldestKey = k
+        }
+      }
       if (oldestKey) this.cache.delete(oldestKey)
     }
     this.cache.set(key, {
@@ -57,6 +67,7 @@ export class VoiceAudioCache {
       format,
       createdAt: Date.now(),
       hitCount: 1,
+      lastUsed: Date.now(),
     })
   }
 
@@ -73,16 +84,43 @@ export class VoiceAudioCache {
   }
 }
 
+/** @deprecated Use getAudioCache(sessionId) instead. Retained for backward compatibility with v1 callers. */
 export const globalAudioCache = new VoiceAudioCache(150)
+
+const audioCaches = new Map<string, VoiceAudioCache>()
+
+/**
+ * Factory: retrieves or creates a session-scoped VoiceAudioCache.
+ * Eliminates cross-session state contamination from shared audio cache.
+ */
+export function getAudioCache(sessionId = 'default'): VoiceAudioCache {
+  let cache = audioCaches.get(sessionId)
+  if (!cache) {
+    cache = new VoiceAudioCache(150)
+    audioCaches.set(sessionId, cache)
+  }
+  return cache
+}
+
+/**
+ * Cleans up the audio cache for a session that has ended.
+ */
+export function clearAudioCache(sessionId: string): void {
+  const cache = audioCaches.get(sessionId)
+  cache?.clear()
+  audioCaches.delete(sessionId)
+}
 
 /**
  * Guardián de Cuota y Frugalidad para Síntesis de Voz.
+ * Per-session instance to prevent cross-session quota leakage.
  */
 export class VoiceQuotaGuard {
   private totalSessionChars = 0
   private readonly config: VoiceGuardConfig
+  private readonly audioCache: VoiceAudioCache
 
-  constructor(config: VoiceGuardConfig = {}) {
+  constructor(config: VoiceGuardConfig = {}, audioCache?: VoiceAudioCache) {
     this.config = {
       enabled: config.enabled ?? true,
       maxCharsPerTurn: config.maxCharsPerTurn ?? 350,
@@ -91,6 +129,7 @@ export class VoiceQuotaGuard {
       skipTrivialSpeech: config.skipTrivialSpeech ?? true,
       enforceAdvisoryConciseness: config.enforceAdvisoryConciseness ?? true,
     }
+    this.audioCache = audioCache ?? globalAudioCache
   }
 
   /**
@@ -181,7 +220,7 @@ export class VoiceQuotaGuard {
 
     // 4. Verificación de Caché
     const cacheKey = VoiceAudioCache.createKey(processedText)
-    const isCached = this.config.enableAudioCache ? globalAudioCache.has(cacheKey) : false
+    const isCached = this.config.enableAudioCache ? this.audioCache.has(cacheKey) : false
 
     return {
       allowed: true,
@@ -197,7 +236,7 @@ export class VoiceQuotaGuard {
     return {
       totalSessionChars: this.totalSessionChars,
       maxSessionChars: this.config.maxSessionChars ?? 50000,
-      cachedEntries: globalAudioCache.size(),
+      cachedEntries: this.audioCache.size(),
     }
   }
 
@@ -207,34 +246,71 @@ export class VoiceQuotaGuard {
 }
 
 /**
- * Registra el Voice Guard & Quota Shield en Cordis.
+ * Factory: retrieves or creates a session-scoped VoiceQuotaGuard.
+ * Uses session-scoped audio cache to isolate state across concurrent agent contexts.
  */
+export function getVoiceQuotaGuard(sessionId = 'default', config: VoiceGuardConfig = {}): VoiceQuotaGuard {
+  return new VoiceQuotaGuard(config, getAudioCache(sessionId))
+}
+
+/**
+ * Registra el Voice Guard & Quota Shield en Cordis.
+ * Uses per-request factory pattern to avoid global singleton state.
+ */
+interface VoicePreResponseEvent {
+  speechPayload?: {
+    text?: string
+    disabled?: boolean
+    skipReason?: string
+    isCached?: boolean
+    savedChars?: number
+  }
+  sessionId?: string
+}
+
 export function registerVoiceGuard(ctx: Context, config: VoiceGuardConfig = {}): void {
-  const guard = new VoiceQuotaGuard(config)
-
   // Hook previo a la respuesta del agente para filtrar y gobernar la cuota de voz
-  ctx.on('agent/pre-response' as any, async (payload: any) => {
-    if (!payload?.speechPayload?.text) return
+  ctx.on('agent/pre-response', async (payload: unknown) => {
+    if (!payload || typeof payload !== 'object') return
+    const ev = payload as VoicePreResponseEvent
+    if (!ev?.speechPayload?.text) return
 
-    const economy = guard.evaluateSpeechEconomy(payload.speechPayload.text)
+    const sessionId = ev.sessionId || 'default'
+    const guard = getVoiceQuotaGuard(sessionId, config)
+
+    const economy = guard.evaluateSpeechEconomy(ev.speechPayload.text)
     if (!economy.allowed) {
-      payload.speechPayload.disabled = true
-      payload.speechPayload.skipReason = economy.skipReason
-      payload.speechPayload.text = ''
+      ev.speechPayload.disabled = true
+      if (economy.skipReason !== undefined) ev.speechPayload.skipReason = economy.skipReason
+      ev.speechPayload.text = ''
     } else {
-      payload.speechPayload.text = economy.processedText
-      payload.speechPayload.isCached = economy.isCached
-      payload.speechPayload.savedChars = economy.savedChars
+      ev.speechPayload.text = economy.processedText
+      ev.speechPayload.isCached = economy.isCached
+      ev.speechPayload.savedChars = economy.savedChars
     }
   })
 
   // Hook durante ejecución de herramientas para emitir status pills de acompañamiento (Claude Code style)
-  ctx.on('tools/pre-execute' as any, async (payload: any) => {
-    const toolName = payload?.name || payload?.toolName || 'herramienta'
-    const args = payload?.arguments || payload?.args || {}
+  ctx.on('tools/pre-execute', async (payload: unknown, next?: () => Promise<unknown>): Promise<unknown> => {
+    if (!payload || typeof payload !== 'object') {
+      return typeof next === 'function' ? next() : { kind: 'allow' }
+    }
+    const ev = payload as { name?: string; toolName?: string; arguments?: Record<string, unknown>; args?: Record<string, unknown> }
+    const toolName = ev.name || ev.toolName || 'herramienta'
+    const args = ev.arguments || ev.args || {}
     const pill = generateStepPill(toolName, args)
 
     // Emitir píldora de progreso en texto para el frontend / CLI
-    ctx.emit('step-feedback/pill' as any, pill)
+    ctx.emit('step-feedback/pill', pill)
+
+    return typeof next === 'function' ? next() : { kind: 'allow' }
+  })
+
+  // Hook session/end to clean up voice guard state for the terminating session
+  ctx.on('session/end', (event: unknown) => {
+    const ev = event as { sessionId?: string } | undefined
+    if (ev?.sessionId) {
+      clearAudioCache(ev.sessionId)
+    }
   })
 }

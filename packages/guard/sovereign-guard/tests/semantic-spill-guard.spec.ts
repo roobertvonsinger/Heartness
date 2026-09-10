@@ -64,7 +64,7 @@ describe('Semantic Spill Guard Suite (Issue #14)', () => {
       }
       const rawText = lines.join('\n')
 
-      const exec = { name: 'run_service_scan' } as any
+      const exec = { name: 'run_service_scan' }
       const result = [{ type: 'text' as const, text: rawText }]
 
       const decision = await ctx.waterfall(
@@ -94,8 +94,8 @@ describe('Semantic Spill Guard Suite (Issue #14)', () => {
         expect(existsSync(txtPath)).toBe(true)
         expect(existsSync(metaPath)).toBe(true)
 
-        // Read and verify structured metadata
-        const meta = readSpillMetadata(metaPath)
+        // Read and verify structured metadata (async — no event loop blocking)
+        const meta = await readSpillMetadata(metaPath)
         expect(meta).toBeDefined()
         expect(meta?.tool).toBe('run_service_scan')
         expect(meta?.originalLines).toBe(250)

@@ -339,7 +339,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       /* jscpd:ignore-end */
       render: (_args, value) => [{
         type: 'text',
-        text: value.kind === 'background'
+        text: (value && typeof value === 'object' && 'kind' in value && value.kind === 'background')
           ? `started background job ${value.jobId}`
           : renderPwshResult(value as RenderablePwshResult, escalationModes),
       }],
