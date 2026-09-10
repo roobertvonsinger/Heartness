@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
-import type { AntigravityOptimizerConfig, RoutingRule } from './types.ts'
+import { detectIntent } from './intent-radar.ts'
+import type {
+  AntigravityOptimizerConfig,
+  RoutingRule,
+  SovereignRoutingConfig,
+} from './types.ts'
 
 export interface CacheEntry<T = unknown> {
   key: string
@@ -162,6 +167,95 @@ export async function executeToolsInParallel<T, R>(
   return results
 }
 
+export const DEFAULT_SOVEREIGN_POOLS: Required<NonNullable<SovereignRoutingConfig['pools']>> = {
+  battle: {
+    strategy: 'primary-fallback',
+    models: ['ag/gemini-3.8-flash-high', 'ag/gemini-3.7-flash-high', 'ag/gemini-3.6-flash-high'],
+  },
+  reasoning: {
+    strategy: 'primary-fallback',
+    models: ['cc/claude-sonnet-5', 'ag/gemini-3.8-flash-high', 'cc/claude-opus-5'],
+  },
+  grunt: {
+    strategy: 'round-robin',
+    models: [
+      'deepseek/deepseek-chat',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+    ],
+  },
+  sensitive: {
+    strategy: 'primary-fallback',
+    models: [
+      'mistral/mistral-medium-3-5',
+      'mistral/codestral-latest',
+      'venice/venice-uncensored-1-2',
+      'venice/olafangensan-glm-4.7-flash-heretic',
+    ],
+  },
+}
+
+export function classifyPromptPool(
+  prompt: string,
+  minSensitiveConfidence = 0.9,
+): 'sensitive' | 'reasoning' | 'grunt' | 'battle' {
+  const p = prompt.toLowerCase()
+
+  // 1. Prioritize sensitive bypass & antibot evasion
+  if (
+    p.includes('bypass') ||
+    p.includes('captcha') ||
+    p.includes('antibot') ||
+    p.includes('stealth') ||
+    p.includes('fingerprint') ||
+    p.includes('betmexico') ||
+    p.includes('ruthopia') ||
+    p.includes('webrtc') ||
+    p.includes('spoof')
+  ) {
+    return 'sensitive'
+  }
+
+  const intent = detectIntent(prompt)
+  if (
+    (intent.category === 'sensitive_bypass' && intent.confidence >= minSensitiveConfidence) ||
+    intent.category === 'security_guard'
+  ) {
+    return 'sensitive'
+  }
+
+  // 2. Heavy reasoning & architectural analysis
+  if (
+    p.includes('architecture') ||
+    p.includes('arquitectura') ||
+    /\bprove\b/i.test(p) ||
+    /\bdemuestra\b/i.test(p) ||
+    p.includes('design system') ||
+    p.includes('analiza a fondo') ||
+    p.includes('root cause') ||
+    p.includes('deep analysis')
+  ) {
+    return 'reasoning'
+  }
+
+  // 3. Grunt work (translation, summarization, bulk reads)
+  if (
+    p.includes('summarize') ||
+    p.includes('resume') ||
+    p.includes('translate') ||
+    p.includes('traduce') ||
+    p.includes('transcribe') ||
+    p.includes('formatea') ||
+    (p.includes('lee') && p.includes('archivo')) ||
+    prompt.length > 4000
+  ) {
+    return 'grunt'
+  }
+
+  // 4. Default workhorse battle pool
+  return 'battle'
+}
+
 interface OptimizerRequestPayload {
   config?: LlmCallConfig
   agent?: {
@@ -173,7 +267,12 @@ interface OptimizerRequestPayload {
 export function registerAntigravityOptimizer(
   ctx: Context,
   config: AntigravityOptimizerConfig = {},
-): { cache: ResponseCache; getStats: () => Record<string, unknown> } | undefined {
+): {
+  cache: ResponseCache
+  getStats: () => Record<string, unknown>
+  recordModelFailure: (model: string) => void
+  resetModelFailures: () => void
+} | undefined {
   if (config.enabled === false) return undefined
 
   const cacheConfig = config.cache ?? {}
@@ -185,7 +284,27 @@ export function registerAntigravityOptimizer(
     { pattern: '*quick*|*status*|*ping*|*format*', priority: 7, targetModel: 'mistral/codestral-latest' },
   ]
 
-  // Priority-based model selection
+  const sovereignRouting = config.sovereignRouting
+  const pools = {
+    battle: sovereignRouting?.pools?.battle ?? DEFAULT_SOVEREIGN_POOLS.battle,
+    reasoning: sovereignRouting?.pools?.reasoning ?? DEFAULT_SOVEREIGN_POOLS.reasoning,
+    grunt: sovereignRouting?.pools?.grunt ?? DEFAULT_SOVEREIGN_POOLS.grunt,
+    sensitive: sovereignRouting?.pools?.sensitive ?? DEFAULT_SOVEREIGN_POOLS.sensitive,
+  }
+  const minSensitiveConfidence = sovereignRouting?.minSensitiveConfidence ?? 0.9
+
+  let gruntRotationIndex = 0
+  const failedModels = new Set<string>()
+
+  const recordModelFailure = (model: string): void => {
+    failedModels.add(model)
+  }
+
+  const resetModelFailures = (): void => {
+    failedModels.clear()
+  }
+
+  // Model selection via pools (if sovereignRouting is enabled) or glob routing rules
   ctx.on('agent/request', async (payload: unknown, next?: () => Promise<LlmCallConfig>): Promise<LlmCallConfig> => {
     const rawConfig = typeof next === 'function' ? await next() : null
     const p = payload as OptimizerRequestPayload | undefined
@@ -208,12 +327,33 @@ export function registerAntigravityOptimizer(
       // best-effort
     }
 
-    if (rawPrompt && routingRules.length > 0) {
-      const matched = matchRoutingRule(rawPrompt, routingRules)
-      if (matched && matched.targetModel) {
-        return {
-          ...callConfig,
-          model: matched.targetModel,
+    if (rawPrompt) {
+      if (sovereignRouting?.enabled) {
+        const poolKey = classifyPromptPool(rawPrompt, minSensitiveConfidence)
+        const selectedPool = pools[poolKey]
+        if (selectedPool && selectedPool.models.length > 0) {
+          let chosenModel: string | undefined
+          if (selectedPool.strategy === 'round-robin') {
+            chosenModel = selectedPool.models[gruntRotationIndex % selectedPool.models.length]
+            gruntRotationIndex++
+          } else {
+            // primary-fallback: pick first healthy model
+            chosenModel = selectedPool.models.find(m => !failedModels.has(m)) ?? selectedPool.models[0]
+          }
+          if (chosenModel) {
+            return {
+              ...callConfig,
+              model: chosenModel,
+            }
+          }
+        }
+      } else if (routingRules.length > 0) {
+        const matched = matchRoutingRule(rawPrompt, routingRules)
+        if (matched && matched.targetModel) {
+          return {
+            ...callConfig,
+            model: matched.targetModel,
+          }
         }
       }
     }
@@ -224,5 +364,7 @@ export function registerAntigravityOptimizer(
   return {
     cache,
     getStats: () => cache.getStats(),
+    recordModelFailure,
+    resetModelFailures,
   }
 }

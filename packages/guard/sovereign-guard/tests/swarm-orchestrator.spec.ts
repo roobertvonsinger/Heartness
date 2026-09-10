@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { SwarmOrchestrator, type SwarmTaskRequest } from '../src/swarm-orchestrator.ts'
+import { describe, it, expect, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import { SwarmOrchestrator, registerSwarmOrchestrator, type SwarmTaskRequest } from '../src/swarm-orchestrator.ts'
 
 describe('SwarmOrchestrator Suite', () => {
   it('should execute parallel mode successfully across triad agents', async () => {
@@ -60,5 +61,54 @@ describe('SwarmOrchestrator Suite', () => {
     expect(result.mode).toBe('DEBATE')
     expect(result.turnResponses.length).toBe(2)
     expect(result.finalSynthesis).toContain('RITA (rita_lead)')
+  })
+
+  it('should forward custom agent.model in fetch payload', async () => {
+    const originalFetch = globalThis.fetch
+    let capturedBody: { model?: string } | undefined
+    globalThis.fetch = vi.fn().mockImplementation(async (_url, init) => {
+      if (init?.body) {
+        capturedBody = JSON.parse(init.body as string)
+      }
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          choices: [{ message: { content: 'Custom model response' } }],
+        }),
+      } as unknown as Response
+    })
+
+    try {
+      const orchestrator = new SwarmOrchestrator()
+      const result = await orchestrator.executeSwarm({
+        mode: 'SEQUENTIAL',
+        task: 'Test custom model dispatch',
+        agents: [
+          {
+            id: 'custom_agent',
+            role: 'CUSTOM',
+            endpoint: 'http://localhost:8000/v1/chat/completions',
+            model: 'mistral/codestral-latest',
+          },
+        ],
+      })
+
+      expect(result.turnResponses[0].status).toBe('SUCCESS')
+      expect(capturedBody?.model).toBe('mistral/codestral-latest')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('registerSwarmOrchestrator respects config.enabled', () => {
+    const ctx = new Context()
+    const disabled = registerSwarmOrchestrator(ctx, { enabled: false })
+    expect(disabled).toBeUndefined()
+
+    const enabled = registerSwarmOrchestrator(ctx, { enabled: true, defaultTimeboxMs: 15000 })
+    expect(enabled).toBeDefined()
+    expect(enabled).toBeInstanceOf(SwarmOrchestrator)
   })
 })

@@ -32,6 +32,7 @@ import { registerBrainGraph } from './brain-graph.ts'
 import { registerOpenDesign } from './open-design.ts'
 import { registerAdaptivePivoter } from './adaptive-pivoter.ts'
 import { registerProgressStreamRelay } from './progress-stream-relay.ts'
+import { registerSwarmOrchestrator } from './swarm-orchestrator.ts'
 
 export const name = 'sovereign-guard'
 export const inject = ['systemPrompt']
@@ -49,6 +50,9 @@ import type {
   ThermalModulatorConfig,
   ReflexiveAuditorConfig,
   AntigravityOptimizerConfig,
+  PoolStrategy,
+  ModelPool,
+  SovereignRoutingConfig,
   RoutingRule,
   ResponseCacheConfig,
   ParallelToolConfig,
@@ -110,6 +114,9 @@ export type {
   ThermalModulatorConfig,
   ReflexiveAuditorConfig,
   AntigravityOptimizerConfig,
+  PoolStrategy,
+  ModelPool,
+  SovereignRoutingConfig,
   RoutingRule,
   ResponseCacheConfig,
   ParallelToolConfig,
@@ -166,7 +173,14 @@ export { extractSemanticExcerpts, readSpillMetadata } from './spill-guard.ts'
 export { evaluateToolSafety } from './decision-interceptor.ts'
 export { calculateQualityScore, registerQualityAuditor } from './quality-auditor.ts'
 export { registerReflexiveAuditor } from './reflexive-auditor.ts'
-export { ResponseCache, matchRoutingRule, executeToolsInParallel, registerAntigravityOptimizer } from './antigravity-optimizer.ts'
+export {
+  ResponseCache,
+  matchRoutingRule,
+  executeToolsInParallel,
+  registerAntigravityOptimizer,
+  DEFAULT_SOVEREIGN_POOLS,
+  classifyPromptPool,
+} from './antigravity-optimizer.ts'
 export { TelemetryCollector, registerHarnessTelemetry } from './harness-telemetry.ts'
 export { createKeepAliveSession, registerKeepAliveGateway } from './keep-alive-gateway.ts'
 export { generateStepPill, MidTurnSteeringQueue, globalSteeringQueue, registerStepFeedback } from './step-feedback.ts'
@@ -207,7 +221,7 @@ export {
   registerReflexiveLearner,
 } from './reflexive-learner.ts'
 export type { ExecutionStepTrace } from './reflexive-learner.ts'
-export { SwarmOrchestrator } from './swarm-orchestrator.ts'
+export { SwarmOrchestrator, registerSwarmOrchestrator } from './swarm-orchestrator.ts'
 export { HTCCalibrator, registerHTCCalibrator } from './htc-calibrator.ts'
 export type { MacroDynamicsFeatures, MicroStabilityFeatures, TrajectoryTrace } from './htc-calibrator.ts'
 export { BrainGraph, registerBrainGraph } from './brain-graph.ts'
@@ -429,6 +443,12 @@ export const GUARD_REGISTRY: GuardEntry[] = [
     tier: 'peripheral',
     configKey: 'progressStream',
     register: (ctx, cfg) => registerProgressStreamRelay(ctx, (cfg as ProgressStreamConfig) ?? {}),
+  },
+  {
+    name: 'swarmOrchestrator',
+    tier: 'peripheral',
+    configKey: 'swarmOrchestrator',
+    register: (ctx, cfg) => registerSwarmOrchestrator(ctx, (cfg as SwarmOrchestratorConfig) ?? {}),
   },
 ]
 

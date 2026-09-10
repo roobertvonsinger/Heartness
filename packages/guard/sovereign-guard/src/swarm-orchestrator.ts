@@ -1,8 +1,12 @@
+import type { Context } from '@deepseek-ai/cordis'
+import type { SwarmOrchestratorConfig } from './types.ts'
+
 export type SwarmAgentRole = 'RITA' | 'ANTIGRAVITY' | 'KAREN' | 'HERMES' | 'CUSTOM'
 
 export interface SwarmAgentProfile {
   id: string
   role: SwarmAgentRole
+  model?: string
   endpoint?: string
   systemPrompt?: string
   timeoutMs?: number
@@ -113,7 +117,7 @@ export class SwarmOrchestrator {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            model: 'nousresearch/hermes-3-llama-3.1-8b',
+            model: agent.model ?? 'nousresearch/hermes-3-llama-3.1-8b',
             messages: [
               { role: 'system', content: agent.systemPrompt || `You are ${agent.role} in sovereign triad.` },
               { role: 'user', content: `${historyContext}\n\nTask: ${prompt}` },
@@ -250,4 +254,17 @@ export class SwarmOrchestrator {
       timedOut: false,
     }
   }
+}
+
+/**
+ * Registra el Swarm Orchestrator en Cordis (opt-in).
+ */
+export function registerSwarmOrchestrator(
+  ctx: Context,
+  config: SwarmOrchestratorConfig = {},
+): SwarmOrchestrator | undefined {
+  if (config.enabled !== true) return undefined
+  const orchestrator = new SwarmOrchestrator(config)
+  ctx.provide('swarmOrchestrator', orchestrator)
+  return orchestrator
 }

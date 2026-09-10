@@ -18,6 +18,9 @@
           supportsStore: false
         models:
           # --- 🚀 WORKHORSE REAL (95% DE LA TALACHA, CODING Y CONTEXTO 1M) ---
+          - id: ag/gemini-3.8-flash-high
+            name: Gemini 3.8 Flash High (SOTA Workhorse / 1M Ctx / Coding Masivo)
+            contextWindow: 1048576
           - id: ag/gemini-3.7-flash-high
             name: Gemini 3.7 Flash High (Talacha Pesada / 1M Ctx / Coding Masivo / Cero Quema)
             contextWindow: 1048576

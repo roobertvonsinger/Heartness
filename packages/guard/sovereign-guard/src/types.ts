@@ -135,11 +135,30 @@ export interface ParallelToolConfig {
   backoffMs?: number
 }
 
+export type PoolStrategy = 'primary-fallback' | 'round-robin'
+
+export interface ModelPool {
+  strategy?: PoolStrategy
+  models: string[]
+}
+
+export interface SovereignRoutingConfig {
+  enabled?: boolean
+  pools?: {
+    battle?: ModelPool
+    reasoning?: ModelPool
+    grunt?: ModelPool
+    sensitive?: ModelPool
+  }
+  minSensitiveConfidence?: number
+}
+
 export interface AntigravityOptimizerConfig {
   enabled?: boolean
   routingRules?: RoutingRule[]
   cache?: ResponseCacheConfig
   tools?: ParallelToolConfig
+  sovereignRouting?: SovereignRoutingConfig
 }
 
 export interface AnomalyThresholds {
@@ -285,6 +304,7 @@ export type SwarmAgentRole = 'RITA' | 'ANTIGRAVITY' | 'KAREN' | 'HERMES' | 'CUST
 export interface SwarmAgentProfile {
   id: string
   role: SwarmAgentRole
+  model?: string
   endpoint?: string
   systemPrompt?: string
   timeoutMs?: number
@@ -652,6 +672,27 @@ export const ParallelToolConfig: z<ParallelToolConfig> = z.object({
   backoffMs: z.number().default(500),
 })
 
+export const ModelPool: z<ModelPool> = z.object({
+  strategy: z.union(['primary-fallback', 'round-robin'] as const).default('primary-fallback'),
+  models: z.array(z.string()).default([]),
+})
+
+export const SovereignRoutingConfig: z<SovereignRoutingConfig> = z.object({
+  enabled: z.boolean().default(false),
+  pools: z.object({
+    battle: ModelPool.default({ strategy: 'primary-fallback', models: [] }),
+    reasoning: ModelPool.default({ strategy: 'primary-fallback', models: [] }),
+    grunt: ModelPool.default({ strategy: 'round-robin', models: [] }),
+    sensitive: ModelPool.default({ strategy: 'primary-fallback', models: [] }),
+  }).default({
+    battle: { strategy: 'primary-fallback', models: [] },
+    reasoning: { strategy: 'primary-fallback', models: [] },
+    grunt: { strategy: 'round-robin', models: [] },
+    sensitive: { strategy: 'primary-fallback', models: [] },
+  }),
+  minSensitiveConfidence: z.number().default(0.9),
+})
+
 export const AntigravityOptimizerConfig: z<AntigravityOptimizerConfig> = z.object({
   enabled: z.boolean().default(true),
   routingRules: z.array(RoutingRule).default([
@@ -662,6 +703,7 @@ export const AntigravityOptimizerConfig: z<AntigravityOptimizerConfig> = z.objec
   ]),
   cache: ResponseCacheConfig.default({}),
   tools: ParallelToolConfig.default({}),
+  sovereignRouting: SovereignRoutingConfig.default({}),
 })
 
 export const AnomalyThresholds: z<AnomalyThresholds> = z.object({

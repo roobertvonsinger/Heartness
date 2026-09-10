@@ -29,11 +29,12 @@ describe('GUARD_REGISTRY — Declarative Guard Manifest & Lifecycle', () => {
     'openDesign',
     'adaptivePivoter',
     'progressStream',
+    'swarmOrchestrator',
   ]
 
-  it('Test A: GUARD_REGISTRY contains exactly 25 entries in canonical order', () => {
+  it('Test A: GUARD_REGISTRY contains exactly 26 entries in canonical order', () => {
     expect(GUARD_REGISTRY).toBeDefined()
-    expect(GUARD_REGISTRY.length).toBe(25)
+    expect(GUARD_REGISTRY.length).toBe(26)
 
     const actualNames = GUARD_REGISTRY.map(g => g.name)
     expect(actualNames).toEqual(EXPECTED_NAMES)
@@ -48,7 +49,7 @@ describe('GUARD_REGISTRY — Declarative Guard Manifest & Lifecycle', () => {
     ])
 
     const peripheralEntries = GUARD_REGISTRY.filter(g => g.tier === 'peripheral')
-    expect(peripheralEntries.length).toBe(21)
+    expect(peripheralEntries.length).toBe(22)
   })
 
   it('Test B: every entry defines valid tier, configKey matching SovereignGuardConfig, and register fn', () => {
@@ -79,6 +80,7 @@ describe('GUARD_REGISTRY — Declarative Guard Manifest & Lifecycle', () => {
       openDesign: {},
       adaptivePivoter: {},
       progressStream: {},
+      swarmOrchestrator: {},
     }
 
     for (const entry of GUARD_REGISTRY) {
