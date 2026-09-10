@@ -62,12 +62,12 @@ async function runBenchmark(): Promise<void> {
       const execPayload = { name: 'run_terminal', callId: `bench-${i}` }
       const rawResult = { content: [{ type: 'text' as const, text: lines }] }
 
-      const decision = (await ctx.waterfall(
+      const decision = ((await (ctx as unknown as { waterfall: (event: string, ...args: unknown[]) => Promise<unknown> }).waterfall(
         'tools/post-execute',
-        execPayload as unknown,
-        rawResult as unknown,
+        execPayload,
+        rawResult,
         () => Promise.resolve({ kind: 'accept', content: rawResult.content }),
-      )) as { kind: string; content: Array<{ type: string; text: string }> }
+      )) as unknown) as { kind: string; content: Array<{ type: string; text: string }> }
 
       const dt = performance.now() - t0
       latencies.push(dt)
@@ -133,9 +133,9 @@ async function runBenchmark(): Promise<void> {
     for (let i = 0; i < iterations; i++) {
       const t0 = performance.now()
       const agent = { options: { model: 'venice/heretic-default' } }
-      const res = (await ctx.waterfall(
+      const res = (await (ctx as unknown as { waterfall: (event: string, ...args: unknown[]) => Promise<unknown> }).waterfall(
         'agent/pre-step',
-        { agent, messages: history } as unknown,
+        { agent, messages: history },
         () => ({ kind: 'enter', messages: history }),
       )) as { messages: Array<{ content: Array<{ text: string }> }> }
       const dt = performance.now() - t0

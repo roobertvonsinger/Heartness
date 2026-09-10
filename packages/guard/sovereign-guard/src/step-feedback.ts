@@ -6,6 +6,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { StepFeedbackConfig } from './types.ts'
 
 export interface StepPill {
@@ -332,8 +333,8 @@ export function registerStepFeedback(
   })
 
   // Hook agent/pre-step to inject pending mid-turn steering directives into active conversation without restart
-  ctx.on('agent/pre-step', async (payload: unknown) => {
-    const p = payload as {
+  ctx.on('agent/pre-step', async (payload, next) => {
+    const p = payload as unknown as {
       agent?: { sessionId?: string }
       sessionId?: string
       messages?: Array<{ role: string; content: string; metadata?: Record<string, unknown> }>
@@ -352,6 +353,7 @@ export function registerStepFeedback(
         ctx.emit('steering/injected', { sessionId, injection })
       }
     }
+    return typeof next === 'function' ? next() : ({ kind: 'enter', messages: [] } satisfies PreStepDecision)
   })
 
   // Hook session/end to clean up steering queue for the terminating session

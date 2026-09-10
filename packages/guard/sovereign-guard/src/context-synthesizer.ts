@@ -163,17 +163,18 @@ export async function synthesizeRawOutput(
 export function registerContextSynthesizer(ctx: Context, config: ContextSynthesizerConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('tool/after-call', async (payload) => {
-    if (!payload || !payload.result) return
+  ctx.on('tool/after-call', async (payload: unknown) => {
+    const p = payload as { result?: unknown; name?: string; _synthesized?: boolean; _reductionPercent?: number } | undefined
+    if (!p || !p.result) return
 
-    const raw = typeof payload.result === 'string' ? payload.result : JSON.stringify(payload.result)
+    const raw = typeof p.result === 'string' ? p.result : JSON.stringify(p.result)
     const threshold = config.maxRawCharsThreshold ?? 1500
 
     if (raw.length > threshold) {
-      const synthesized = await synthesizeRawOutput(raw, (payload as { name?: string }).name || 'unknown_tool', config)
-      payload.result = synthesized.digest
-      payload._synthesized = true
-      payload._reductionPercent = synthesized.reductionPercent
+      const synthesized = await synthesizeRawOutput(raw, p.name || 'unknown_tool', config)
+      p.result = synthesized.digest
+      p._synthesized = true
+      p._reductionPercent = synthesized.reductionPercent
     }
   })
 }

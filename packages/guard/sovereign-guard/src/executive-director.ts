@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { ExecutiveCognitionConfig } from './types.ts'
 
 export interface ExecutivePlan {
@@ -94,7 +95,7 @@ export function synthesizeExecutivePlan(
 export function registerExecutiveCognition(ctx: Context, config: ExecutiveCognitionConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('agent/pre-step', async (payload: unknown) => {
+  ctx.on('agent/pre-step', async (payload, next) => {
     const p = payload as { messages?: Array<{ role?: string; content?: unknown }> } | undefined
     const messages = p?.messages ?? []
     const systemMsg = messages.find(m => m.role === 'system')
@@ -102,5 +103,6 @@ export function registerExecutiveCognition(ctx: Context, config: ExecutiveCognit
     if (systemMsg && typeof systemMsg.content === 'string') {
       systemMsg.content = injectExecutiveDirectives(systemMsg.content, config)
     }
+    return typeof next === 'function' ? next() : ({ kind: 'enter', messages: [] } satisfies PreStepDecision)
   })
 }

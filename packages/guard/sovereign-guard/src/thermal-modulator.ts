@@ -67,8 +67,8 @@ export function calculateSyntacticWeight(text: string): { score: number; metrics
 interface AgentRequestPayload {
   config?: LlmCallConfig
   agent?: {
-    messages?: Array<{ role?: string; content?: unknown }>
-    session?: { messages?: Array<{ role?: string; content?: unknown }> }
+    messages?: Array<{ role?: string; source?: { kind?: string }; content?: Array<{ type?: string; text?: string }> }>
+    session?: { messages?: Array<{ role?: string; source?: { kind?: string }; content?: Array<{ type?: string; text?: string }> }> }
   }
 }
 
@@ -88,7 +88,7 @@ export function registerThermalModulator(ctx: Context, config: ThermalModulatorC
   ctx.on('agent/request', async (payload: unknown, next?: () => Promise<LlmCallConfig>): Promise<LlmCallConfig> => {
     const rawConfig = typeof next === 'function' ? await next() : null
     const p = payload as AgentRequestPayload | undefined
-    const callConfig: LlmCallConfig = rawConfig ?? p?.config ?? {}
+    const callConfig = (rawConfig ?? p?.config ?? {}) as LlmCallConfig
     const agent = p?.agent
 
     // Extract raw user prompt and inspect recent message history
@@ -108,7 +108,7 @@ export function registerThermalModulator(ctx: Context, config: ThermalModulatorC
         // Check if previous 2 turns contained actual tool failures or execution errors (ignore user prompt text)
         if (feedbackDriven && i >= messages.length - 2 && msg?.source?.kind !== 'user' && msg?.role !== 'user') {
           for (const block of msg?.content ?? []) {
-            if (block.type === 'text' && /\b(error|exception|failed|fatal|uncaught|assertionerror)\b/i.test(block.text)) {
+            if (block.type === 'text' && /\b(error|exception|failed|fatal|uncaught|assertionerror)\b/i.test(block.text ?? '')) {
               recentHasErrors = true
             }
           }

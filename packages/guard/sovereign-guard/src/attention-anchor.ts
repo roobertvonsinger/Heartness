@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { AttentionAnchorConfig } from './types.ts'
 
 export interface TaskItem {
@@ -179,27 +180,29 @@ interface SessionEndPayload {
 export function registerAttentionAnchor(ctx: Context, config: AttentionAnchorConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('agent/pre-step', (payload: unknown) => {
-    const p = payload as AttentionPreStepPayload | undefined
+  ctx.on('agent/pre-step', async (payload, next) => {
+    const p = payload as unknown as AttentionPreStepPayload | undefined
     const sessionId = p?.sessionId || 'default'
     const ledger = getAttentionLedger(sessionId)
 
     ledger.incrementTurn()
 
-    if (config.injectLedgerHeader === false) return
+    if (config.injectLedgerHeader !== false) {
+      const messages = p?.messages ?? []
+      const systemMsg = messages.find(m => m.role === 'system')
+      const header = ledger.renderAnchorHeader()
 
-    const messages = p?.messages ?? []
-    const systemMsg = messages.find(m => m.role === 'system')
-    const header = ledger.renderAnchorHeader()
-
-    if (systemMsg && typeof systemMsg.content === 'string') {
-      if (!systemMsg.content.includes('[⚓ ATTENTION ANCHOR')) {
-        systemMsg.content = `${header}\n\n${systemMsg.content}`
-      } else {
-        // Reemplazar header anterior con el estado fresco del turno
-        systemMsg.content = systemMsg.content.replace(/\[⚓ ATTENTION ANCHOR[\s\S]*?\n\n/, `${header}\n\n`)
+      if (systemMsg && typeof systemMsg.content === 'string') {
+        if (!systemMsg.content.includes('[⚓ ATTENTION ANCHOR')) {
+          systemMsg.content = `${header}\n\n${systemMsg.content}`
+        } else {
+          // Reemplazar header anterior con el estado fresco del turno
+          systemMsg.content = systemMsg.content.replace(/\[⚓ ATTENTION ANCHOR[\s\S]*?\n\n/, `${header}\n\n`)
+        }
       }
     }
+
+    return typeof next === 'function' ? next() : ({ kind: 'enter', messages: [] } satisfies PreStepDecision)
   })
 
   // Sincronizar automáticamente eventos del tool todo_write con el AttentionLedger

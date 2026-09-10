@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { QualityAuditResult, QualityAuditorConfig, QualityMetrics } from './types.ts'
 
 export function calculateQualityScore(
@@ -105,16 +106,16 @@ export function registerQualityAuditor(ctx: Context, config: QualityAuditorConfi
   const minPassingScore = config.minPassingScore ?? 85
 
   // Inspect responses on agent execution completion
-  ctx.on('agent/pre-step', async (payload: unknown, next?: () => Promise<unknown>): Promise<unknown> => {
-    const downstream = typeof next === 'function' ? await next() : { kind: 'enter' }
-    const p = payload as { messages?: Array<{ content?: Array<{ type?: string; text?: string }> }> } | undefined
+  ctx.on('agent/pre-step', async (payload, next) => {
+    const downstream = typeof next === 'function' ? await next() : ({ kind: 'enter', messages: [] } satisfies PreStepDecision)
+    const p = payload as unknown as { messages?: Array<{ content?: Array<{ type?: string; text?: string }> }> } | undefined
     const messages = p?.messages ?? []
 
     if (messages.length > 0) {
       const lastMsg = messages[messages.length - 1]
       let text = ''
       for (const block of lastMsg?.content ?? []) {
-        if (block.type === 'text') text += block.text
+        if (block.type === 'text') text += block.text ?? ''
       }
 
       if (text && text.length > 50) {

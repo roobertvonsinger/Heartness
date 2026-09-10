@@ -189,7 +189,7 @@ export function registerAntigravityOptimizer(
   ctx.on('agent/request', async (payload: unknown, next?: () => Promise<LlmCallConfig>): Promise<LlmCallConfig> => {
     const rawConfig = typeof next === 'function' ? await next() : null
     const p = payload as OptimizerRequestPayload | undefined
-    const callConfig: LlmCallConfig = rawConfig ?? p?.config ?? {}
+    const callConfig = (rawConfig ?? p?.config ?? {}) as LlmCallConfig
     const agent = p?.agent
 
     let rawPrompt = ''

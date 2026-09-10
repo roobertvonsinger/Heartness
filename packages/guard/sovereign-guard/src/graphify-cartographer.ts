@@ -1,5 +1,6 @@
 import { readFile, access } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { GraphifyCartographerConfig } from './types.ts'
 
 export interface GraphNode {
@@ -202,13 +203,15 @@ export function registerGraphifyCartographer(ctx: Context, config: GraphifyCarto
   })
 
   // Hook para inyectar subgrafos relevantes al planificar o en pre-step
-  ctx.on('agent/pre-step', async (payload: unknown) => {
-    if (!activeGraph || config.autoInjectSubgraphs === false) return
+  ctx.on('agent/pre-step', async (payload, next) => {
+    const fallback = (): PreStepDecision => ({ kind: 'enter', messages: [] })
+    const runNext = typeof next === 'function' ? next : fallback
+    if (!activeGraph || config.autoInjectSubgraphs === false) return runNext()
 
     const p = payload as { messages?: Array<{ role?: string; content?: unknown }> } | undefined
     const messages = p?.messages ?? []
     const lastUserMsg = messages.filter(m => m.role === 'user').pop()
-    if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return
+    if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return runNext()
 
     const content = lastUserMsg.content
     // Si el usuario pregunta por arquitectura, dependencias o impacto
@@ -218,5 +221,6 @@ export function registerGraphifyCartographer(ctx: Context, config: GraphifyCarto
         lastUserMsg.content = `${sub.summary}\n\n${lastUserMsg.content}`
       }
     }
+    return runNext()
   })
 }

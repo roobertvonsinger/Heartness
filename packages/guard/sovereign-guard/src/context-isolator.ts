@@ -74,15 +74,15 @@ export function registerContextIsolator(ctx: Context, config: ContextIsolatorCon
     const agent = p?.agent
     const messages = (p?.messages ?? []) as unknown as Extract<PreStepDecision, { kind: 'enter' }>['messages']
     const model = agent?.options?.model ?? agent?.model ?? ''
-    const fallbackNext = (): PreStepDecision => (typeof next === 'function' ? next() : { kind: 'enter', messages })
+    const fallbackNext = async (): Promise<PreStepDecision> => (typeof next === 'function' ? await next() : { kind: 'enter', messages })
 
     if (!model || messages.length <= 1) {
-      return fallbackNext()
+      return await fallbackNext()
     }
 
     const matched = rules.find(r => r.regex.test(model))
     if (!matched) {
-      return fallbackNext()
+      return await fallbackNext()
     }
 
     const { maxTurns: baseMaxTurns, maxInputChars: baseMaxInputChars } = matched.rule

@@ -102,7 +102,7 @@ export class PillCoalescer {
       return {
         toolName: '_empty',
         pill: '',
-        category: 'other',
+        category: 'info',
         timestamp: this.lastEmitTime,
       }
     }

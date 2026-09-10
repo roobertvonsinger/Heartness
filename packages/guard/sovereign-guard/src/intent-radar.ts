@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { ProactiveIntentRadarConfig } from './types.ts'
 
 export type IntentCategory = 'refactor' | 'new_feature' | 'debug_fix' | 'infra_ops' | 'database_storage' | 'security_guard' | 'ui_design' | 'sensitive_bypass' | 'general'
@@ -192,18 +193,18 @@ interface AgentPreStepPayload {
 export function registerIntentRadar(ctx: Context, config: ProactiveIntentRadarConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('agent/pre-step', (payload: unknown) => {
-    const p = payload as AgentPreStepPayload | undefined
+  ctx.on('agent/pre-step', async (payload, next) => {
+    const p = payload as unknown as AgentPreStepPayload | undefined
     const messages = p?.messages ?? []
     const lastUserMsg = messages.filter(m => m.role === 'user').pop()
-    if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return
-
-    // Evitar inyección duplicada si ya contiene el radar
-    if (lastUserMsg.content.includes('[🧠 SOVEREIGN INTENT RADAR:')) return
-
-    const intent = detectIntent(lastUserMsg.content)
-    const briefing = generateSovereignRadarBriefing(intent, config)
-
-    lastUserMsg.content = `${briefing.briefingText}\n\n${lastUserMsg.content}`
+    if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+      // Evitar inyección duplicada si ya contiene el radar
+      if (!lastUserMsg.content.includes('[🧠 SOVEREIGN INTENT RADAR:')) {
+        const intent = detectIntent(lastUserMsg.content)
+        const briefing = generateSovereignRadarBriefing(intent, config)
+        lastUserMsg.content = `${briefing.briefingText}\n\n${lastUserMsg.content}`
+      }
+    }
+    return typeof next === 'function' ? next() : ({ kind: 'enter', messages: [] } satisfies PreStepDecision)
   })
 }

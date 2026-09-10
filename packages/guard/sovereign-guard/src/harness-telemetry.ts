@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreToolDecision, PostToolDecision } from '@deepseek-ai/dsh-tools'
 import type { HarnessTelemetryConfig } from './types.ts'
 
 export interface LlmRequestEvent {
@@ -215,14 +216,14 @@ export function registerHarnessTelemetry(
   // Track tool execution times
   const activeToolTimers = new Map<object, number>()
 
-  ctx.on('tools/pre-execute', async (exec: unknown, next?: () => Promise<unknown>) => {
+  ctx.on('tools/pre-execute', async (exec, next) => {
     if (exec && typeof exec === 'object') {
       activeToolTimers.set(exec, Date.now())
     }
-    return typeof next === 'function' ? next() : { kind: 'allow' }
+    return typeof next === 'function' ? next() : ({ kind: 'allow' } satisfies PreToolDecision)
   })
 
-  ctx.on('tools/post-execute', async (exec: unknown, result: unknown, next?: () => Promise<unknown>) => {
+  ctx.on('tools/post-execute', async (exec, result, next) => {
     if (exec && typeof exec === 'object') {
       const startTime = activeToolTimers.get(exec)
       if (startTime) {
@@ -238,7 +239,7 @@ export function registerHarnessTelemetry(
         })
       }
     }
-    return typeof next === 'function' ? next() : result
+    return typeof next === 'function' ? next() : ((result as unknown as PostToolDecision) ?? ({ kind: 'accept', content: [] } satisfies PostToolDecision))
   })
 
   return collector

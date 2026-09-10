@@ -105,10 +105,7 @@ export function registerKeepAliveGateway(ctx: Context, config: KeepAliveGatewayC
     }
 
     try {
-      if (typeof next === 'function') {
-        return await next()
-      }
-      return session as unknown
+      return await next()
     } finally {
       if (sessionPulse) {
         sessionPulse.stop()

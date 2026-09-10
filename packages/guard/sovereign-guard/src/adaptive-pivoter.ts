@@ -128,7 +128,8 @@ export class AdaptivePivoterEngine {
 export function registerAdaptivePivoter(ctx: Context, maxRetries = 2): AdaptivePivoterEngine {
   const engine = new AdaptivePivoterEngine(maxRetries)
 
-  ctx.on('agent/tool-error', async (payload: unknown) => {
+  const eventHost = ctx as unknown as { on: (event: string, listener: (payload: unknown) => void) => void }
+  eventHost.on('agent/tool-error', async (payload: unknown) => {
     const p = payload as { toolName?: string; name?: string; args?: Record<string, unknown>; error?: string } | undefined
     const toolName = p?.toolName || p?.name || 'unknown'
     const args = p?.args || {}
@@ -141,7 +142,7 @@ export function registerAdaptivePivoter(ctx: Context, maxRetries = 2): AdaptiveP
     }
   })
 
-  ctx.on('agent/tool-success', async (payload: unknown) => {
+  eventHost.on('agent/tool-success', async (payload: unknown) => {
     const p = payload as { toolName?: string; name?: string; args?: Record<string, unknown> } | undefined
     const toolName = p?.toolName || p?.name || 'unknown'
     const args = p?.args || {}

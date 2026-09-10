@@ -10,6 +10,7 @@
 import { createHash } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { VoiceGuardConfig, VoiceEconomyReport } from './types.ts'
+import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
 import { splitIntoSpeechSentences } from './voice-gateway.ts'
 import { generateStepPill } from './step-feedback.ts'
 
@@ -270,7 +271,8 @@ interface VoicePreResponseEvent {
 
 export function registerVoiceGuard(ctx: Context, config: VoiceGuardConfig = {}): void {
   // Hook previo a la respuesta del agente para filtrar y gobernar la cuota de voz
-  ctx.on('agent/pre-response', async (payload: unknown) => {
+  const eventHost = ctx as unknown as { on: (event: string, listener: (payload: unknown) => Promise<void>) => void }
+  eventHost.on('agent/pre-response', async (payload: unknown) => {
     if (!payload || typeof payload !== 'object') return
     const ev = payload as VoicePreResponseEvent
     if (!ev?.speechPayload?.text) return
@@ -291,13 +293,10 @@ export function registerVoiceGuard(ctx: Context, config: VoiceGuardConfig = {}):
   })
 
   // Hook durante ejecución de herramientas para emitir status pills de acompañamiento (Claude Code style)
-  ctx.on('tools/pre-execute', async (payload: unknown, next?: () => Promise<unknown>): Promise<unknown> => {
-    if (!payload || typeof payload !== 'object') {
-      return typeof next === 'function' ? next() : { kind: 'allow' }
-    }
-    const ev = payload as { name?: string; toolName?: string; arguments?: Record<string, unknown>; args?: Record<string, unknown> }
-    const toolName = ev.name || ev.toolName || 'herramienta'
-    const args = ev.arguments || ev.args || {}
+  ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
+    const toolName = exec.name || 'herramienta'
+    const execObj = exec as unknown as { args?: Record<string, unknown>; arguments?: Record<string, unknown> }
+    const args = execObj.arguments ?? execObj.args ?? {}
     const pill = generateStepPill(toolName, args)
 
     // Emitir píldora de progreso en texto para el frontend / CLI

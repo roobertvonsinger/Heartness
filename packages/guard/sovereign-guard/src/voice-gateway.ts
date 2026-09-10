@@ -519,7 +519,11 @@ export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig 
     interruptActiveSpeech(ctx, event?.sessionId)
   })
 
-  ctx.on('agent/pre-response', async (payload: { content?: unknown; sessionId?: string; speechPayload?: unknown }) => {
+  type PreResponsePayload = { content?: unknown; sessionId?: string; speechPayload?: unknown }
+  const eventHost = ctx as unknown as {
+    on: (event: string, listener: (payload: PreResponsePayload) => Promise<void>) => void
+  }
+  eventHost.on('agent/pre-response', async (payload: PreResponsePayload) => {
     if (!payload || typeof payload.content !== 'string') return
 
     try {

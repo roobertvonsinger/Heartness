@@ -909,7 +909,12 @@ interface VoiceSpeechReadyEvent {
 interface CanvasBringToViewEvent {
   targetId: string
   label?: string | undefined
+  x?: number | undefined
+  y?: number | undefined
+  scale?: number | undefined
+  durationMs?: number | undefined
   timestamp?: number | undefined
+  sessionId?: string | undefined
 }
 
 interface SessionEndEvent {
@@ -935,15 +940,6 @@ declare module '@deepseek-ai/cordis' {
   interface Events {
     'ready'(): void | Promise<void>
     'dispose'(): void | Promise<void>
-    'agent/pre-step'(payload: unknown, next?: () => Promise<unknown> | unknown): unknown
-    'agent/post-step'(payload: unknown): void | Promise<void>
-    'agent/request'(payload: unknown, next: () => Promise<unknown> | unknown): unknown
-    'agent/response'(response: unknown): void | Promise<void>
-    'agent/pre-response'(payload: unknown): void | Promise<void>
-    'agent/tool-error'(payload: unknown): void | Promise<void>
-    'agent/tool-success'(payload: unknown): void | Promise<void>
-    'tools/pre-execute'(exec: unknown, next?: () => Promise<unknown> | unknown): unknown
-    'tools/post-execute'(exec: unknown, result: unknown, next?: () => Promise<unknown> | unknown): void
     'tool/before-execute'(event: unknown): void | Promise<void>
     'tool/after-execute'(event: unknown): void | Promise<void>
     'tool/after-call'(payload: unknown): void | Promise<void>

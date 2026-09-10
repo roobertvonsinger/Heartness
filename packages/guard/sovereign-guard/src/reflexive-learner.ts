@@ -2,6 +2,7 @@ import { promises as fsp } from 'node:fs'
 import path from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import './types.ts'
+import type { PostToolDecision } from '@deepseek-ai/dsh-tools'
 import { BrainBridge, type ProceduralMemoryItem } from './brain-bridge.ts'
 
 export interface ReflexiveLearnerConfig {
@@ -350,25 +351,27 @@ export async function registerReflexiveLearner(ctx: Context, config: ReflexiveLe
   const learner = await ReflexiveLearner.create(config)
   const activeTraces = new WeakMap<object, ExecutionStepTrace[]>()
 
-  ctx.on('tools/post-execute', async (exec: unknown, result: unknown): Promise<void> => {
-    const execObj = exec as { agent?: object; name?: string; args?: Record<string, unknown> } | undefined
+  ctx.on('tools/post-execute', async (exec, result, next): Promise<PostToolDecision> => {
+    const execObj = exec as unknown as { agent?: object; name?: string; args?: Record<string, unknown> } | undefined
     const agent = execObj?.agent
-    if (!agent) return
+    if (agent) {
+      let trace = activeTraces.get(agent)
+      if (!trace) {
+        trace = []
+        activeTraces.set(agent, trace)
+      }
 
-    let trace = activeTraces.get(agent)
-    if (!trace) {
-      trace = []
-      activeTraces.set(agent, trace)
+      const resObj = result as { error?: unknown; status?: string } | undefined
+      const success = !resObj?.error && resObj?.status !== 'error'
+      trace.push({
+        toolName: execObj?.name || 'unknown_tool',
+        args: execObj?.args || {},
+        success,
+        resultSummary: typeof (result as unknown) === 'string' ? (result as unknown as string).slice(0, 100) : 'Done',
+      })
     }
 
-    const resObj = result as { error?: unknown; status?: string } | undefined
-    const success = !resObj?.error && resObj?.status !== 'error'
-    trace.push({
-      toolName: execObj?.name || 'unknown_tool',
-      args: execObj?.args || {},
-      success,
-      resultSummary: typeof result === 'string' ? result.slice(0, 100) : 'Done',
-    })
+    return typeof next === 'function' ? next() : { kind: 'accept', content: [] }
   })
 
   ctx.on('dispose', () => {

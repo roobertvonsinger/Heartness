@@ -3,6 +3,7 @@ import { promises as fsPromises } from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { TrajectoryTrace } from './htc-calibrator.ts'
 
 export type GraphNodeKind = 'DOMAIN' | 'SKILL' | 'TOOL' | 'FAILURE_PATTERN' | 'ARCHETYPE'
@@ -499,14 +500,16 @@ export async function registerBrainGraph(ctx: Context, config: BrainGraphConfig 
   ctx.provide('brainGraph', graph)
 
   // Pre-flight prior check in agent/pre-step (<2ms non-blocking)
-  ctx.on('agent/pre-step', async (payload: unknown) => {
+  ctx.on('agent/pre-step', async (payload, next) => {
+    const fallback = (): PreStepDecision => ({ kind: 'enter', messages: [] })
+    const runNext = typeof next === 'function' ? next : fallback
     try {
       const p = payload as { messages?: Array<{ role?: string; content?: unknown }> } | undefined
       const messages = p?.messages ?? []
-      if (!messages || messages.length === 0) return
+      if (!messages || messages.length === 0) return runNext()
 
       const lastUserMsg = messages.filter((m: { role?: string; content?: unknown }) => m.role === 'user').pop()
-      if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return
+      if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return runNext()
 
       const text = lastUserMsg.content
       // Dynamically extract tool words matching existing nodes in graph
@@ -528,6 +531,7 @@ export async function registerBrainGraph(ctx: Context, config: BrainGraphConfig 
     } catch {
       // Fallback silently if lookup exceeds budget or errors
     }
+    return runNext()
   })
 
   // Automatic consolidation & Hebbian decay on session end

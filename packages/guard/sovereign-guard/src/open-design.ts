@@ -1,6 +1,7 @@
 import { readFile, access } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type {
   DesignAuditResult,
   DesignSystemSpec,
@@ -1060,22 +1061,24 @@ export async function registerOpenDesign(ctx: Context, config: OpenDesignConfig 
 
   const defaultSpec = await resolveDesignSystemAsync(config.defaultDesignSystem ?? 'sovereign_dark', config.designSystemsDir)
 
-  ctx.on('agent/pre-step', (payload: unknown) => {
-    const p = payload as AgentPreStepPayload | undefined
+  ctx.on('agent/pre-step', async (payload, next) => {
+    const p = payload as unknown as AgentPreStepPayload | undefined
     const messages = p?.messages ?? []
     const lastUserMsg = messages.filter(m => m.role === 'user').pop()
-    if (!lastUserMsg || typeof lastUserMsg.content !== 'string') return
-
-    const intent = detectIntent(lastUserMsg.content)
-    if (intent.category === 'ui_design' && config.autoInjectDesignTokens !== false) {
-      if (!lastUserMsg.content.includes('[🎨 OPEN-DESIGN SYSTEM ACTIVE:')) {
-        const promptInjection = formatDesignSystemPrompt(defaultSpec)
-        lastUserMsg.content = `${promptInjection}\n\n${lastUserMsg.content}`
+    if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+      const intent = detectIntent(lastUserMsg.content)
+      if (intent.category === 'ui_design' && config.autoInjectDesignTokens !== false) {
+        if (!lastUserMsg.content.includes('[🎨 OPEN-DESIGN SYSTEM ACTIVE:')) {
+          const promptInjection = formatDesignSystemPrompt(defaultSpec)
+          lastUserMsg.content = `${promptInjection}\n\n${lastUserMsg.content}`
+        }
       }
     }
+    return typeof next === 'function' ? next() : ({ kind: 'enter', messages: [] } satisfies PreStepDecision)
   })
 
-  ctx.on('agent/post-step', (payload: unknown) => {
+  const postStepHost = ctx as unknown as { on: (event: string, listener: (payload: unknown) => void) => void }
+  postStepHost.on('agent/post-step', (payload: unknown) => {
     if (config.enforceAntiSlop === false) return
     const p = payload as AgentPostStepPayload | undefined
     const responseContent = p?.response?.content ?? ''
