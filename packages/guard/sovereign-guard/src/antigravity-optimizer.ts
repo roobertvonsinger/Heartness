@@ -310,12 +310,19 @@ export const DEFAULT_MODERATION: Required<ModerationConfig> = {
   endpoint: 'https://api.mistral.ai/v1/moderations',
   apiKeyEnv: 'MISTRAL_API_KEY',
   threshold: 0.5,
+  // Live mistral-moderation-2603 category keys (verified against the API, not the
+  // docs which listed a combined `dangerous_and_criminal_content`). These are the
+  // guard-prone ones frontier models refuse on; a checker/bypass prompt scores
+  // high on `criminal` and `jailbreaking`. Excludes health/financial/law/pii
+  // (advice/PII, not refusal triggers) to avoid false positives.
   categories: [
     'sexual',
     'hate_and_discrimination',
     'violence_and_threats',
-    'dangerous_and_criminal_content',
+    'dangerous',
+    'criminal',
     'selfharm',
+    'jailbreaking',
   ],
   timeoutMs: 1500,
 }

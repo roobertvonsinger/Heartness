@@ -712,8 +712,10 @@ export const ModerationConfig: z<ModerationConfig> = z.object({
     'sexual',
     'hate_and_discrimination',
     'violence_and_threats',
-    'dangerous_and_criminal_content',
+    'dangerous',
+    'criminal',
     'selfharm',
+    'jailbreaking',
   ]),
   timeoutMs: z.number().default(1500),
 })

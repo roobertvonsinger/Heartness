@@ -364,7 +364,7 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
 
     it('upgrades a keyword-clean prompt to the general sensitive lane when moderation flags it', async () => {
       process.env.MISTRAL_API_KEY = 'test-key'
-      mockModeration({ dangerous_and_criminal_content: 0.94, sexual: 0.01 })
+      mockModeration({ criminal: 0.94, sexual: 0.01 })
       const ctx = new Context()
       SovereignGuard.registerAntigravityOptimizer(ctx, {
         enabled: true,
@@ -377,7 +377,7 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
 
     it('routes a moderation-flagged prompt with a code signal to the sensitive_code lane', async () => {
       process.env.MISTRAL_API_KEY = 'test-key'
-      mockModeration({ dangerous_and_criminal_content: 0.9 })
+      mockModeration({ criminal: 0.9 })
       const ctx = new Context()
       SovereignGuard.registerAntigravityOptimizer(ctx, {
         enabled: true,
@@ -390,7 +390,7 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
 
     it('keeps the keyword verdict (battle) when moderation returns clean scores', async () => {
       process.env.MISTRAL_API_KEY = 'test-key'
-      mockModeration({ dangerous_and_criminal_content: 0.02, sexual: 0.01 })
+      mockModeration({ criminal: 0.02, sexual: 0.01 })
       const ctx = new Context()
       SovereignGuard.registerAntigravityOptimizer(ctx, {
         enabled: true,
