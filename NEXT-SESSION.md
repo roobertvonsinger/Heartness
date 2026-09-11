@@ -1,15 +1,15 @@
 # NEXT-SESSION — dsh × Continuidad Soberana
 
 <!-- NEXT-SESSION.md — dsh × Continuidad Soberana -->
-<!-- FACTUAL ARTIFACT DERIVED FROM REPO TELEMETRY (SHA-256: be85b5373d2b1025c650826a2bbd7ce5fc09e70baaf8e0608dc878e715819a1e) -->
+<!-- FACTUAL ARTIFACT DERIVED FROM REPO TELEMETRY (SHA-256: 5cfdd154babb0e1ed11eaae7d1e30d76174fca96fd53af590ff20df0288c260a) -->
 
 ## 📊 Telemetría de Estado Verificable
-- **Fecha:** 2026-09-10 (19:58:54 UTC)
+- **Fecha:** 2026-09-11 (00:05:59 UTC)
 - **Agente Activo:** `antigravity`
-- **Git Telemetría:** Rama `master` | Commit `7a78eef982` (*feat(guard): router por pools (batalla/razonamiento/talacha/sensible) + fallback + swarm*)
-- **Árbol de Trabajo:** 🟡 1 archivos modificados
-- **Suites de Test:** 🟢 6/6 PASS (Smoke tests en 3.45s)
-- **SHA-256 Verificación:** `be85b5373d2b1025c650826a2bbd7ce5fc09e70baaf8e0608dc878e715819a1e`
+- **Git Telemetría:** Rama `master` | Commit `f60de5c9ea` (*fix(core,guard): restaurar tools runtime, alinear catalog vivo 9router y desacoplar events cordis*)
+- **Árbol de Trabajo:** 🟢 Limpio (0 archivos pendientes)
+- **Suites de Test:** ⚪ No ejecutados
+- **SHA-256 Verificación:** `5cfdd154babb0e1ed11eaae7d1e30d76174fca96fd53af590ff20df0288c260a`
 
 ---
 
