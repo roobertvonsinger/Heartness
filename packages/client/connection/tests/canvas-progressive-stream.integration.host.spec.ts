@@ -7,8 +7,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { registerProgressStreamRelay } from '../../../guard/sovereign-guard/src/progress-stream-relay.ts'
 import { generateStepPill, registerStepFeedback, globalSteeringQueue } from '../../../guard/sovereign-guard/src/step-feedback.ts'
-import '../../../guard/sovereign-guard/src/types.ts'
-import type { ProgressFrame, BringToViewFrame } from '../../../guard/sovereign-guard/src/types.ts'
+import { asEventBus, type ProgressFrame, type BringToViewFrame } from '../../../guard/sovereign-guard/src/types.ts'
 import { CANVAS_EVENTS_PATH } from '../src/api-path.ts'
 import { WebSocketDownlinks } from '../src/websocket-downlink.ts'
 
@@ -71,7 +70,7 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     // Emit a step-pill as would occur when agent decides to inspect a file
     const pill = generateStepPill('view_file', { AbsolutePath: 'apps/web/src/components/TotalCanvas.tsx' })
     const startTime = performance.now()
-    ctx.emit('progress/step-pill', pill)
+    asEventBus(ctx).emit('progress/step-pill', pill)
 
     await vi.waitFor(() => {
       expect(receivedFrames.length).toBeGreaterThanOrEqual(1)
@@ -107,13 +106,13 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     })
 
     // Simulate tool start
-    ctx.emit('tool/before-execute', { name: 'run_command', args: { CommandLine: 'pnpm test' } })
+    asEventBus(ctx).emit('tool/before-execute', { name: 'run_command', args: { CommandLine: 'pnpm test' } })
 
     // Simulate elapsed time > 100ms
     await new Promise(r => setTimeout(r, 120))
 
     // Simulate tool completion
-    ctx.emit('tool/after-execute', { name: 'run_command' })
+    asEventBus(ctx).emit('tool/after-execute', { name: 'run_command' })
 
     await vi.waitFor(() => {
       const completion = receivedFrames.find(f => f.category === 'complete')
@@ -142,10 +141,10 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     })
 
     // Rapid burst of 4 pills
-    ctx.emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'a.ts' }))
-    ctx.emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'b.ts' }))
-    ctx.emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'c.ts' }))
-    ctx.emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'd.ts' }))
+    asEventBus(ctx).emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'a.ts' }))
+    asEventBus(ctx).emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'b.ts' }))
+    asEventBus(ctx).emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'c.ts' }))
+    asEventBus(ctx).emit('progress/step-pill', generateStepPill('view_file', { AbsolutePath: 'd.ts' }))
 
     await vi.waitFor(() => {
       // 1 initial + 1 coalesced summary (instead of 4 separate UI-thrashing updates)
@@ -158,7 +157,7 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     ws.close()
   })
 
-  it('delivers bring_to_view frames over /api/canvas/events in real time (<16ms)', async () => {
+  it('delivers bring_to_view canvas focus events directly to client', async () => {
     const ctx = new Context()
     registerProgressStreamRelay(ctx)
 
@@ -169,31 +168,29 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     const ws = new WebSocket(`${host.origin}${CANVAS_EVENTS_PATH}`)
     await once(ws, 'open')
 
-    const received: BringToViewFrame[] = []
+    const receivedBringToView: BringToViewFrame[] = []
     ws.on('message', (data) => {
-      const parsed = JSON.parse(String(data))
-      if (parsed.type === 'bring_to_view') {
-        received.push(parsed)
-      }
+      const msg = JSON.parse(String(data))
+      if (msg.type === 'bring_to_view') receivedBringToView.push(msg)
     })
 
     const start = performance.now()
-    ctx.emit('canvas/bring-to-view', {
+    asEventBus(ctx).emit('canvas/bring-to-view', {
       targetId: 'nodeB',
       label: 'Nodo B',
       scale: 1.35,
-      durationMs: 450,
+      durationMs: 300,
       timestamp: Date.now(),
     })
 
     await vi.waitFor(() => {
-      expect(received.length).toBe(1)
+      expect(receivedBringToView.length).toBe(1)
+      expect(receivedBringToView[0]!.targetId).toBe('nodeB')
+      expect(receivedBringToView[0]!.scale).toBe(1.35)
     }, { timeout: 1000 })
 
     const latency = performance.now() - start
     expect(latency).toBeLessThan(100)
-    expect(received[0]!.targetId).toBe('nodeB')
-    expect(received[0]!.scale).toBe(1.35)
 
     ws.close()
   })
@@ -210,7 +207,7 @@ describe('Sub-Plan C Checkpoint: Total Canvas & Progressive Streaming Handoff', 
     await once(ws, 'open')
 
     let steeredEvent: { directive?: string; text?: string; sessionId?: string } | undefined
-    ctx.on('user/mid-turn-input', (ev: unknown) => {
+    asEventBus(ctx).on('user/mid-turn-input', (ev: unknown) => {
       steeredEvent = ev as { directive?: string; text?: string; sessionId?: string }
     })
 

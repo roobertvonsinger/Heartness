@@ -7,7 +7,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { StepFeedbackConfig } from './types.ts'
+import { asEventBus, type StepFeedbackConfig } from './types.ts'
 
 export interface StepPill {
   toolName: string
@@ -291,17 +291,17 @@ export function registerStepFeedback(
   if (config.enabled === false) return
 
   // Hook tool execution lifecycle to dispatch orientative pills
-  ctx.on('tool/before-execute', (event: unknown) => {
+  asEventBus(ctx).on('tool/before-execute', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown> }
     const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {})
-    ctx.emit('progress/step-pill', pill)
+    asEventBus(ctx).emit('progress/step-pill', pill)
 
     // Focus target node if tool targets a visual entity
     if (ev.args && typeof ev.args === 'object') {
       const targetId = (ev.args.nodeId || ev.args.targetId || ev.args.node || (ev.args.target as string))
       if (typeof targetId === 'string' && targetId.trim()) {
-        ctx.emit('canvas/bring-to-view', {
+        asEventBus(ctx).emit('canvas/bring-to-view', {
           targetId: targetId.trim(),
           label: targetId.trim(),
           timestamp: Date.now(),
@@ -310,24 +310,24 @@ export function registerStepFeedback(
     }
   })
 
-  ctx.on('tool/after-execute', (event: unknown) => {
+  asEventBus(ctx).on('tool/after-execute', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown>; error?: unknown }
     if (ev.error) {
       const pill = generateStepPill(ev.name || ev.tool || 'tool', ev.args || {}, ev.error)
-      ctx.emit('progress/step-pill', pill)
+      asEventBus(ctx).emit('progress/step-pill', pill)
     }
   })
 
   // Hook user input / steering during active run
-  ctx.on('user/mid-turn-input', (event: unknown) => {
+  asEventBus(ctx).on('user/mid-turn-input', (event: unknown) => {
     if (event && typeof event === 'object') {
       const ev = event as { sessionId?: string; text?: string; directive?: string }
       const dir = (ev.directive || ev.text)?.trim()
       const sid = ev.sessionId || 'default'
       if (dir) {
         effectiveQueue.push(sid, dir)
-        ctx.emit('steering/queued', { sessionId: sid, directive: dir })
+        asEventBus(ctx).emit('steering/queued', { sessionId: sid, directive: dir })
       }
     }
   })
@@ -350,14 +350,14 @@ export function registerStepFeedback(
             metadata: { isMidTurnSteering: true, timestamp: Date.now() },
           })
         }
-        ctx.emit('steering/injected', { sessionId, injection })
+        asEventBus(ctx).emit('steering/injected', { sessionId, injection })
       }
     }
     return typeof next === 'function' ? next() : ({ kind: 'enter', messages: [] } satisfies PreStepDecision)
   })
 
   // Hook session/end to clean up steering queue for the terminating session
-  ctx.on('session/end', (event: unknown) => {
+  asEventBus(ctx).on('session/end', (event: unknown) => {
     const ev = event as { sessionId?: string } | undefined
     const sid = ev?.sessionId
     if (sid) {

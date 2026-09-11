@@ -6,14 +6,15 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type {
-  DualTrackVoiceConfig,
-  CartesiaVoiceProfile,
-  ElevenLabsVoiceProfile,
-  VoiceModifiers,
-  CartesiaStreamRequest,
-  ElevenLabsStreamRequest,
-  BringToViewFrame,
+import {
+  asEventBus,
+  type DualTrackVoiceConfig,
+  type CartesiaVoiceProfile,
+  type ElevenLabsVoiceProfile,
+  type VoiceModifiers,
+  type CartesiaStreamRequest,
+  type ElevenLabsStreamRequest,
+  type BringToViewFrame,
 } from './types.ts'
 
 export interface DualTrackResult {
@@ -504,7 +505,7 @@ export function extractDualTrackPayload(
  */
 export function interruptActiveSpeech(ctx?: Context, sessionId?: string): void {
   if (ctx) {
-    ctx.emit('voice/interrupt', { sessionId, timestamp: Date.now() })
+    asEventBus(ctx).emit('voice/interrupt', { sessionId, timestamp: Date.now() })
   }
 }
 
@@ -515,8 +516,9 @@ export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig 
   if (config.enabled === false) return
 
   // Listen to mid-turn user inputs to interrupt running voice synthesis immediately
-  ctx.on('user/mid-turn-input', (event: { sessionId?: string }) => {
-    interruptActiveSpeech(ctx, event?.sessionId)
+  asEventBus(ctx).on('user/mid-turn-input', (event: unknown) => {
+    const ev = event as { sessionId?: string } | undefined
+    interruptActiveSpeech(ctx, ev?.sessionId)
   })
 
   type PreResponsePayload = { content?: unknown; sessionId?: string; speechPayload?: unknown }
@@ -540,10 +542,10 @@ export function registerVoiceGateway(ctx: Context, config: DualTrackVoiceConfig 
       }
 
       if (dualTrack.bringToView) {
-        ctx.emit('canvas/bring-to-view', dualTrack.bringToView)
+        asEventBus(ctx).emit('canvas/bring-to-view', dualTrack.bringToView)
       }
 
-      ctx.emit('voice/speech-ready', { speechPayload: payload.speechPayload as Record<string, unknown> | undefined })
+      asEventBus(ctx).emit('voice/speech-ready', { speechPayload: payload.speechPayload as Record<string, unknown> | undefined })
     } catch (err) {
       // Fail-open: voice degradation must never disrupt textual response
       ctx.logger?.warn?.(`[VoiceGateway] Pre-response synthesis bypass: ${String(err)}`)

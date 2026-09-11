@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import type { VoiceGuardConfig, VoiceEconomyReport } from './types.ts'
+import { asEventBus, type VoiceGuardConfig, type VoiceEconomyReport } from './types.ts'
 import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
 import { splitIntoSpeechSentences } from './voice-gateway.ts'
 import { generateStepPill } from './step-feedback.ts'
@@ -300,13 +300,13 @@ export function registerVoiceGuard(ctx: Context, config: VoiceGuardConfig = {}):
     const pill = generateStepPill(toolName, args)
 
     // Emitir píldora de progreso en texto para el frontend / CLI
-    ctx.emit('step-feedback/pill', pill)
+    asEventBus(ctx).emit('step-feedback/pill', pill)
 
     return typeof next === 'function' ? next() : { kind: 'allow' }
   })
 
   // Hook session/end to clean up voice guard state for the terminating session
-  ctx.on('session/end', (event: unknown) => {
+  asEventBus(ctx).on('session/end', (event: unknown) => {
     const ev = event as { sessionId?: string } | undefined
     if (ev?.sessionId) {
       clearAudioCache(ev.sessionId)

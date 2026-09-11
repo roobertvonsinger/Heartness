@@ -939,64 +939,11 @@ export const SovereignGuardConfig: z<SovereignGuardConfig> = z.object({
   progressStream: ProgressStreamConfig.default({}),
 }) as unknown as z<SovereignGuardConfig>
 
-interface VoiceInterruptEvent {
-  sessionId?: string | undefined
-  timestamp: number
+export interface EventBus {
+  emit: (event: string, ...args: unknown[]) => void
+  on: (event: string, listener: (...args: unknown[]) => void | Promise<void>) => void
 }
 
-interface VoiceSpeechReadyEvent {
-  speechPayload?: Record<string, unknown> | undefined
-}
-
-interface CanvasBringToViewEvent {
-  targetId: string
-  label?: string | undefined
-  x?: number | undefined
-  y?: number | undefined
-  scale?: number | undefined
-  durationMs?: number | undefined
-  timestamp?: number | undefined
-  sessionId?: string | undefined
-}
-
-interface SessionEndEvent {
-  sessionId?: string | undefined
-}
-
-interface StepPill {
-  toolName: string
-  pill: string
-  category: string
-  timestamp: number
-}
-
-interface SessionConnectEvent {
-  sessionId?: string | undefined
-}
-
-interface SessionDisconnectEvent {
-  sessionId?: string | undefined
-}
-
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    'ready'(): void | Promise<void>
-    'dispose'(): void | Promise<void>
-    'tool/before-execute'(event: unknown): void | Promise<void>
-    'tool/after-execute'(event: unknown): void | Promise<void>
-    'tool/after-call'(payload: unknown): void | Promise<void>
-    'tool/result'(payload: unknown): void | Promise<void>
-    'user/mid-turn-input'(event: unknown): void | Promise<void>
-    'session/end'(event?: SessionEndEvent): void | Promise<void>
-    'progress/step-pill'(pill: StepPill): void | Promise<void>
-    'progress/session-connect'(event: SessionConnectEvent): void | Promise<void>
-    'progress/session-disconnect'(event: SessionDisconnectEvent): void | Promise<void>
-    'canvas/bring-to-view'(event: CanvasBringToViewEvent): void | Promise<void>
-    'voice/interrupt'(event: VoiceInterruptEvent): void | Promise<void>
-    'voice/speech-ready'(event: VoiceSpeechReadyEvent): void | Promise<void>
-    'steering/queued'(event: { sessionId: string; directive: string }): void | Promise<void>
-    'steering/injected'(event: { sessionId: string; injection: string }): void | Promise<void>
-    'step-feedback/pill'(pill: StepPill): void | Promise<void>
-    'progress/stream-frame'(frame: CanvasEventFrame): void | Promise<void>
-  }
+export function asEventBus(ctx: unknown): EventBus {
+  return ctx as unknown as EventBus
 }

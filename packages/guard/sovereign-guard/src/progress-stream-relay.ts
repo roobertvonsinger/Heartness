@@ -10,7 +10,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ProgressStreamConfig, ProgressFrame, BringToViewFrame, CanvasEventFrame } from './types.ts'
+import { asEventBus, type ProgressStreamConfig, type ProgressFrame, type BringToViewFrame, type CanvasEventFrame } from './types.ts'
 import type { StepPill } from './step-feedback.ts'
 
 export interface ProgressRelaySession {
@@ -239,8 +239,8 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
   const sessions = new Map<string, ProgressRelaySession>()
 
   // Bridge: listen for step pills from the event bus
-  ctx.on('progress/step-pill', (pill: StepPill) => {
-    const processed = coalescer.process(pill)
+  asEventBus(ctx).on('progress/step-pill', (pill: unknown) => {
+    const processed = coalescer.process(pill as StepPill)
     if (!processed) return
 
     const frame = pillToFrame(processed)
@@ -253,11 +253,11 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
     }
 
     // Also emit on the bus for any other listeners (canvas events WS, etc.)
-    ctx.emit('progress/stream-frame', frame)
+    asEventBus(ctx).emit('progress/stream-frame', frame)
   })
 
   // Track tool execution start times for duration measurement
-  ctx.on('tool/before-execute', (event: unknown) => {
+  asEventBus(ctx).on('tool/before-execute', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; args?: Record<string, unknown> }
     const toolName = ev.name || ev.tool || 'tool'
@@ -267,7 +267,7 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
   })
 
   // Emit completion frames with measured duration
-  ctx.on('tool/after-execute', (event: unknown) => {
+  asEventBus(ctx).on('tool/after-execute', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as { name?: string; tool?: string; error?: unknown }
     const toolName = ev.name || ev.tool || 'tool'
@@ -295,7 +295,7 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
             session.send(frame)
           }
         }
-        ctx.emit('progress/stream-frame', frame)
+        asEventBus(ctx).emit('progress/stream-frame', frame)
       }
     }
 
@@ -312,7 +312,7 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
   })
 
   // Listen for bring-to-view events to broadcast camera guidance frames to connected canvas clients
-  ctx.on('canvas/bring-to-view', (event: unknown) => {
+  asEventBus(ctx).on('canvas/bring-to-view', (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const ev = event as Record<string, unknown>
     const frame: BringToViewFrame = {
@@ -332,20 +332,24 @@ export function registerProgressStreamRelay(ctx: Context, config: ProgressStream
       }
     }
 
-    ctx.emit('progress/stream-frame', frame)
+    asEventBus(ctx).emit('progress/stream-frame', frame)
   })
 
   // Expose session management on the context for WebSocket handlers
-  ctx.on('progress/session-connect', (event: { sessionId: string; emitter: (frame: CanvasEventFrame) => void }) => {
-    const session = createProgressRelaySession(event.emitter, config)
-    sessions.set(event.sessionId, session)
+  asEventBus(ctx).on('progress/session-connect', (event: unknown) => {
+    const ev = event as { sessionId: string; emitter: (frame: CanvasEventFrame) => void }
+    const session = createProgressRelaySession(ev.emitter, config)
+    sessions.set(ev.sessionId, session)
   })
 
-  ctx.on('progress/session-disconnect', (event: { sessionId: string }) => {
-    const session = sessions.get(event.sessionId)
-    if (session) {
-      session.stop()
-      sessions.delete(event.sessionId)
+  asEventBus(ctx).on('progress/session-disconnect', (event: unknown) => {
+    const ev = event as { sessionId: string } | undefined
+    if (ev?.sessionId) {
+      const session = sessions.get(ev.sessionId)
+      if (session) {
+        session.stop()
+        sessions.delete(ev.sessionId)
+      }
     }
   })
 }

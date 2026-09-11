@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { TrajectoryTrace } from './htc-calibrator.ts'
+import { asEventBus } from './types.ts'
 
 export type GraphNodeKind = 'DOMAIN' | 'SKILL' | 'TOOL' | 'FAILURE_PATTERN' | 'ARCHETYPE'
 export type GraphEdgeRelation = 'REINFORCES' | 'DEGRADES' | 'MITIGATES' | 'INVOKES' | 'PRECONDITION'
@@ -535,13 +536,13 @@ export async function registerBrainGraph(ctx: Context, config: BrainGraphConfig 
   })
 
   // Automatic consolidation & Hebbian decay on session end
-  ctx.on('session/end', () => {
+  asEventBus(ctx).on('session/end', () => {
     try {
       graph.pruneAndConsolidate()
     } catch {}
   })
 
-  ctx.on('dispose', () => {
+  asEventBus(ctx).on('dispose', () => {
     try {
       graph.pruneAndConsolidate()
     } catch {}

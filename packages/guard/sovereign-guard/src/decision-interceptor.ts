@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
-import type { DecisionInterceptorConfig } from './types.ts'
+import { asEventBus, type DecisionInterceptorConfig } from './types.ts'
 
 export interface DecisionEvaluation {
   action: 'AUTO_RESOLVE' | 'ALLOW' | 'BLOCK' | 'CONFIRM'
@@ -150,7 +150,7 @@ export function registerDecisionInterceptor(ctx: Context, config: DecisionInterc
     return (typeof next === 'function' ? next() : { kind: 'allow' }) as PreToolDecision
   })
 
-  ctx.on('session/end', (event: unknown) => {
+  asEventBus(ctx).on('session/end', (event: unknown) => {
     const ev = event as { sessionId?: string } | undefined
     if (ev?.sessionId) {
       consecutiveReadsBySession.delete(ev.sessionId)

@@ -179,9 +179,11 @@ export const DEFAULT_SOVEREIGN_POOLS: Required<NonNullable<SovereignRoutingConfi
   grunt: {
     strategy: 'round-robin',
     models: [
-      'deepseek/deepseek-chat',
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'qwen/qwen-2.5-72b-instruct:free',
+      'openrouter/openrouter/free',
+      'openrouter/cohere/north-mini-code:free',
+      'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
+      'openrouter/google/gemma-4-31b-it:free',
+      'openrouter/inclusionai/ling-3.0-flash:free',
     ],
   },
   sensitive: {
@@ -189,8 +191,8 @@ export const DEFAULT_SOVEREIGN_POOLS: Required<NonNullable<SovereignRoutingConfi
     models: [
       'mistral/mistral-medium-3-5',
       'mistral/codestral-latest',
-      'venice/venice-uncensored-1-2',
-      'venice/olafangensan-glm-4.7-flash-heretic',
+      'Venice/venice-uncensored-1-2',
+      'Venice/olafangensan-glm-4.7-flash-heretic',
     ],
   },
 }

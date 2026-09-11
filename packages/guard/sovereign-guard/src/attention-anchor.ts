@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { AttentionAnchorConfig } from './types.ts'
+import { asEventBus, type AttentionAnchorConfig } from './types.ts'
 
 export interface TaskItem {
   id: string
@@ -206,7 +206,7 @@ export function registerAttentionAnchor(ctx: Context, config: AttentionAnchorCon
   })
 
   // Sincronizar automáticamente eventos del tool todo_write con el AttentionLedger
-  ctx.on('tool/result', (payload: unknown) => {
+  asEventBus(ctx).on('tool/result', (payload: unknown) => {
     const p = payload as AttentionToolResultPayload | undefined
     const sessionId = p?.sessionId || 'default'
     const toolName = p?.name || p?.toolName
@@ -219,7 +219,7 @@ export function registerAttentionAnchor(ctx: Context, config: AttentionAnchorCon
   })
 
   // Limpiar ledger al finalizar la sesión
-  ctx.on('session/end', (payload: unknown) => {
+  asEventBus(ctx).on('session/end', (payload: unknown) => {
     const p = payload as SessionEndPayload | undefined
     if (p?.sessionId) {
       clearAttentionLedger(p.sessionId)

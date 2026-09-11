@@ -187,7 +187,7 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
         () => Promise.resolve({ provider: 'test', model: 'default' }),
       )
 
-      expect(config.model).toBe('deepseek/deepseek-chat')
+      expect(config.model).toBe('openrouter/openrouter/free')
     })
 
     it('rotates grunt pool across successive requests in round-robin mode', async () => {
@@ -221,9 +221,9 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
       const c2 = await makeGruntReq(2)
       const c3 = await makeGruntReq(3)
 
-      expect(c1.model).toBe('deepseek/deepseek-chat')
-      expect(c2.model).toBe('meta-llama/llama-3.3-70b-instruct:free')
-      expect(c3.model).toBe('qwen/qwen-2.5-72b-instruct:free')
+      expect(c1.model).toBe('openrouter/openrouter/free')
+      expect(c2.model).toBe('openrouter/cohere/north-mini-code:free')
+      expect(c3.model).toBe('openrouter/nvidia/nemotron-3-ultra-550b-a55b:free')
     })
 
     it('falls back to next pool model when primary model is marked as failed', async () => {

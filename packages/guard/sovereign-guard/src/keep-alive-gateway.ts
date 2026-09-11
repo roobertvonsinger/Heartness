@@ -6,7 +6,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { KeepAliveGatewayConfig } from './types.ts'
+import { asEventBus, type KeepAliveGatewayConfig } from './types.ts'
 
 export interface KeepAliveSession {
   touch(): void
@@ -88,7 +88,7 @@ export function registerKeepAliveGateway(ctx: Context, config: KeepAliveGatewayC
   const intervalMs = config.intervalMs ?? 15000
   const pulseString = config.pulseString ?? ': keep-alive\n\n'
 
-  ctx.on('ready', () => {
+  asEventBus(ctx).on('ready', () => {
     // Registered in context for stream adapters and gateway handlers
   })
 

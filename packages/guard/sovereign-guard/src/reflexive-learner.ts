@@ -1,7 +1,7 @@
 import { promises as fsp } from 'node:fs'
 import path from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import './types.ts'
+import { asEventBus } from './types.ts'
 import type { PostToolDecision } from '@deepseek-ai/dsh-tools'
 import { BrainBridge, type ProceduralMemoryItem } from './brain-bridge.ts'
 
@@ -374,7 +374,7 @@ export async function registerReflexiveLearner(ctx: Context, config: ReflexiveLe
     return typeof next === 'function' ? next() : { kind: 'accept', content: [] }
   })
 
-  ctx.on('dispose', () => {
+  asEventBus(ctx).on('dispose', () => {
     learner.close()
   })
 }

@@ -1,7 +1,7 @@
 import { readFile, access } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { GraphifyCartographerConfig } from './types.ts'
+import { asEventBus, type GraphifyCartographerConfig } from './types.ts'
 
 export interface GraphNode {
   id: string
@@ -198,7 +198,7 @@ export function registerGraphifyCartographer(ctx: Context, config: GraphifyCarto
   let activeGraph: KnowledgeGraph | null = null
   const graphPath = config.graphPath ?? '.graphify/graph.json'
 
-  ctx.on('ready', async () => {
+  asEventBus(ctx).on('ready', async () => {
     activeGraph = await loadKnowledgeGraphAsync(graphPath)
   })
 

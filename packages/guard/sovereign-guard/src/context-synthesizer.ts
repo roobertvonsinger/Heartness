@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { ContextSynthesizerConfig } from './types.ts'
+import { asEventBus, type ContextSynthesizerConfig } from './types.ts'
 
 export interface ASTOutline {
   language: string
@@ -163,7 +163,7 @@ export async function synthesizeRawOutput(
 export function registerContextSynthesizer(ctx: Context, config: ContextSynthesizerConfig = {}): void {
   if (config.enabled === false) return
 
-  ctx.on('tool/after-call', async (payload: unknown) => {
+  asEventBus(ctx).on('tool/after-call', async (payload: unknown) => {
     const p = payload as { result?: unknown; name?: string; _synthesized?: boolean; _reductionPercent?: number } | undefined
     if (!p || !p.result) return
 
