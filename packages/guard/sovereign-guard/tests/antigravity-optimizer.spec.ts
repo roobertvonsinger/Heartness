@@ -103,7 +103,7 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
   })
 
   describe('Sovereign Pool Routing (Fase 3)', () => {
-    it('routes "bypass captcha en betmexico" to sensitive pool (mistral/mistral-medium-3-5)', async () => {
+    it('routes "bypass captcha en betmexico" to the general sensitive lane (mistral/mistral-large-latest)', async () => {
       const ctx = new Context()
       await SovereignGuard.apply(ctx, {
         optimizer: {
@@ -129,7 +129,36 @@ describe('Antigravity Optimizer Suite (Issue #15)', () => {
         () => Promise.resolve({ provider: 'test', model: 'default' }),
       )
 
-      expect(config.model).toBe('mistral/mistral-medium-3-5')
+      expect(config.model).toBe('mistral/mistral-large-latest')
+    })
+
+    it('routes a sensitive CODE task to the sensitive_code lane (mistral/codestral-latest)', async () => {
+      const ctx = new Context()
+      await SovereignGuard.apply(ctx, {
+        optimizer: {
+          enabled: true,
+          sovereignRouting: {
+            enabled: true,
+          },
+        },
+      })
+
+      const agent = {
+        messages: [
+          createUserMessage({
+            content: [{ type: 'text', text: 'escribe un checker con request http para el bypass de login en betmexico' }],
+            source: { kind: 'user' },
+          }),
+        ],
+      }
+
+      const config = await ctx.waterfall(
+        'agent/request',
+        { agent, turn: 1, step: 0, signal: new AbortController().signal },
+        () => Promise.resolve({ provider: 'test', model: 'default' }),
+      )
+
+      expect(config.model).toBe('mistral/codestral-latest')
     })
 
     it('routes "refactor this function" to battle pool (ag/gemini-3.8-flash-high)', async () => {

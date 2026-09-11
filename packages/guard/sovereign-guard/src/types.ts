@@ -149,6 +149,7 @@ export interface SovereignRoutingConfig {
     reasoning?: ModelPool
     grunt?: ModelPool
     sensitive?: ModelPool
+    sensitive_code?: ModelPool
   }
   minSensitiveConfidence?: number
 }
@@ -684,11 +685,13 @@ export const SovereignRoutingConfig: z<SovereignRoutingConfig> = z.object({
     reasoning: ModelPool.default({ strategy: 'primary-fallback', models: [] }),
     grunt: ModelPool.default({ strategy: 'round-robin', models: [] }),
     sensitive: ModelPool.default({ strategy: 'primary-fallback', models: [] }),
+    sensitive_code: ModelPool.default({ strategy: 'primary-fallback', models: [] }),
   }).default({
     battle: { strategy: 'primary-fallback', models: [] },
     reasoning: { strategy: 'primary-fallback', models: [] },
     grunt: { strategy: 'round-robin', models: [] },
     sensitive: { strategy: 'primary-fallback', models: [] },
+    sensitive_code: { strategy: 'primary-fallback', models: [] },
   }),
   minSensitiveConfidence: z.number().default(0.9),
 })

@@ -189,18 +189,57 @@ export const DEFAULT_SOVEREIGN_POOLS: Required<NonNullable<SovereignRoutingConfi
   sensitive: {
     strategy: 'primary-fallback',
     models: [
+      'mistral/mistral-large-latest',
       'mistral/mistral-medium-3-5',
-      'mistral/codestral-latest',
       'Venice/venice-uncensored-1-2',
       'Venice/olafangensan-glm-4.7-flash-heretic',
     ],
   },
+  sensitive_code: {
+    strategy: 'primary-fallback',
+    models: [
+      'mistral/codestral-latest',
+      'mistral/mistral-large-latest',
+      'Venice/venice-uncensored-1-2',
+    ],
+  },
+}
+
+/**
+ * Split a sensitive prompt into its code lane (`codestral`-first) or the
+ * general lane. The router picks one healthy model per request and does not
+ * cascade on a soft refusal, so the code-vs-general choice must happen here at
+ * classification time for the per-case model preference to take effect.
+ */
+function sensitiveLane(p: string): 'sensitive' | 'sensitive_code' {
+  const codeSignal =
+    p.includes('lolicode') ||
+    p.includes('openbullet') ||
+    p.includes('checker') ||
+    p.includes(' gate') ||
+    p.includes('script') ||
+    p.includes('request') ||
+    p.includes('endpoint') ||
+    p.includes('payload') ||
+    p.includes('curl') ||
+    p.includes('regex') ||
+    p.includes('parse') ||
+    p.includes('scrap') ||
+    p.includes('reverse') ||
+    p.includes('deobfusc') ||
+    p.includes('exploit') ||
+    p.includes('refactor') ||
+    p.includes('function') ||
+    p.includes('/api') ||
+    p.includes(' api') ||
+    p.includes('http')
+  return codeSignal ? 'sensitive_code' : 'sensitive'
 }
 
 export function classifyPromptPool(
   prompt: string,
   minSensitiveConfidence = 0.9,
-): 'sensitive' | 'reasoning' | 'grunt' | 'battle' {
+): 'sensitive' | 'sensitive_code' | 'reasoning' | 'grunt' | 'battle' {
   const p = prompt.toLowerCase()
 
   // 1. Prioritize sensitive bypass & antibot evasion
@@ -215,7 +254,7 @@ export function classifyPromptPool(
     p.includes('webrtc') ||
     p.includes('spoof')
   ) {
-    return 'sensitive'
+    return sensitiveLane(p)
   }
 
   const intent = detectIntent(prompt)
@@ -223,7 +262,7 @@ export function classifyPromptPool(
     (intent.category === 'sensitive_bypass' && intent.confidence >= minSensitiveConfidence) ||
     intent.category === 'security_guard'
   ) {
-    return 'sensitive'
+    return sensitiveLane(p)
   }
 
   // 2. Heavy reasoning & architectural analysis
@@ -292,6 +331,7 @@ export function registerAntigravityOptimizer(
     reasoning: sovereignRouting?.pools?.reasoning ?? DEFAULT_SOVEREIGN_POOLS.reasoning,
     grunt: sovereignRouting?.pools?.grunt ?? DEFAULT_SOVEREIGN_POOLS.grunt,
     sensitive: sovereignRouting?.pools?.sensitive ?? DEFAULT_SOVEREIGN_POOLS.sensitive,
+    sensitive_code: sovereignRouting?.pools?.sensitive_code ?? DEFAULT_SOVEREIGN_POOLS.sensitive_code,
   }
   const minSensitiveConfidence = sovereignRouting?.minSensitiveConfidence ?? 0.9
 
