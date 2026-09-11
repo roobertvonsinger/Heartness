@@ -172,6 +172,14 @@
             ttlMs: 3600000
           tools:
             maxParallel: 8
+          # Routing soberano por pools (usa DEFAULT_SOVEREIGN_POOLS del codigo,
+          # IDs verificados contra el catalogo vivo -> sin drift). Fallback por salud.
+          sovereignRouting:
+            enabled: true
+            # Clasificador semantico de sensibilidad via Mistral moderation.
+            # Aumenta al keyword; lee MISTRAL_API_KEY (Vibe) del .env gitignored.
+            moderation:
+              enabled: true
         telemetry:
           enabled: true
           prometheusExporter: true
