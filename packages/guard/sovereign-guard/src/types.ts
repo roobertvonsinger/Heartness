@@ -142,6 +142,29 @@ export interface ModelPool {
   models: string[]
 }
 
+/**
+ * Optional semantic sensitivity classifier backed by the Mistral moderation
+ * endpoint. When enabled it augments (never replaces) the keyword classifier:
+ * a prompt the keywords do not already flag is scored by the moderation model,
+ * and any configured category over `threshold` upgrades it to the sensitive lane.
+ * Off by default so the hot path stays keyword-only unless opted in.
+ */
+export interface ModerationConfig {
+  enabled?: boolean
+  /** Moderation model id. Default `mistral-moderation-latest`. */
+  model?: string
+  /** Raw-text moderation endpoint. Default `https://api.mistral.ai/v1/moderations`. */
+  endpoint?: string
+  /** Name of the env var holding the Mistral API key. Default `MISTRAL_API_KEY`. */
+  apiKeyEnv?: string
+  /** Category score at or above which a category counts as tripped. Default 0.5. */
+  threshold?: number
+  /** category_scores keys that route to the sensitive lane when tripped. */
+  categories?: string[]
+  /** Abort the moderation call after this many ms and fall back to keywords. Default 1500. */
+  timeoutMs?: number
+}
+
 export interface SovereignRoutingConfig {
   enabled?: boolean
   pools?: {
@@ -152,6 +175,7 @@ export interface SovereignRoutingConfig {
     sensitive_code?: ModelPool
   }
   minSensitiveConfidence?: number
+  moderation?: ModerationConfig
 }
 
 export interface AntigravityOptimizerConfig {
@@ -678,6 +702,22 @@ export const ModelPool: z<ModelPool> = z.object({
   models: z.array(z.string()).default([]),
 })
 
+export const ModerationConfig: z<ModerationConfig> = z.object({
+  enabled: z.boolean().default(false),
+  model: z.string().default('mistral-moderation-latest'),
+  endpoint: z.string().default('https://api.mistral.ai/v1/moderations'),
+  apiKeyEnv: z.string().default('MISTRAL_API_KEY'),
+  threshold: z.number().default(0.5),
+  categories: z.array(z.string()).default([
+    'sexual',
+    'hate_and_discrimination',
+    'violence_and_threats',
+    'dangerous_and_criminal_content',
+    'selfharm',
+  ]),
+  timeoutMs: z.number().default(1500),
+})
+
 export const SovereignRoutingConfig: z<SovereignRoutingConfig> = z.object({
   enabled: z.boolean().default(false),
   pools: z.object({
@@ -694,6 +734,7 @@ export const SovereignRoutingConfig: z<SovereignRoutingConfig> = z.object({
     sensitive_code: { strategy: 'primary-fallback', models: [] },
   }),
   minSensitiveConfidence: z.number().default(0.9),
+  moderation: ModerationConfig.default({}),
 })
 
 export const AntigravityOptimizerConfig: z<AntigravityOptimizerConfig> = z.object({

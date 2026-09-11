@@ -4,6 +4,7 @@ import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 import { detectIntent } from './intent-radar.ts'
 import type {
   AntigravityOptimizerConfig,
+  ModerationConfig,
   RoutingRule,
   SovereignRoutingConfig,
 } from './types.ts'
@@ -187,19 +188,25 @@ export const DEFAULT_SOVEREIGN_POOLS: Required<NonNullable<SovereignRoutingConfi
     ],
   },
   sensitive: {
+    // Cost-tiered: mistral-large-latest ($6/M out) leads on quality; mistral-small-2603
+    // (Mistral Small 4, $0.60/M out, permissive, reasoning-capable) is the cheap capable
+    // tier; Venice is the truly-uncensored net. mistral-medium-3-5 is deliberately absent
+    // -- at $7.50/M out it is the priciest model in the catalog with no quality win here.
     strategy: 'primary-fallback',
     models: [
       'mistral/mistral-large-latest',
-      'mistral/mistral-medium-3-5',
+      'mistral/mistral-small-2603',
       'Venice/venice-uncensored-1-2',
       'Venice/olafangensan-glm-4.7-flash-heretic',
     ],
   },
   sensitive_code: {
+    // codestral-latest ($0.90/M out, code-specialized) leads; mistral-small-2603 does
+    // agentic coding at $0.60/M out; Venice is the uncensored fallback.
     strategy: 'primary-fallback',
     models: [
       'mistral/codestral-latest',
-      'mistral/mistral-large-latest',
+      'mistral/mistral-small-2603',
       'Venice/venice-uncensored-1-2',
     ],
   },
@@ -297,6 +304,65 @@ export function classifyPromptPool(
   return 'battle'
 }
 
+export const DEFAULT_MODERATION: Required<ModerationConfig> = {
+  enabled: false,
+  model: 'mistral-moderation-latest',
+  endpoint: 'https://api.mistral.ai/v1/moderations',
+  apiKeyEnv: 'MISTRAL_API_KEY',
+  threshold: 0.5,
+  categories: [
+    'sexual',
+    'hate_and_discrimination',
+    'violence_and_threats',
+    'dangerous_and_criminal_content',
+    'selfharm',
+  ],
+  timeoutMs: 1500,
+}
+
+/**
+ * Ask the Mistral moderation endpoint whether a prompt trips a guard-prone
+ * category. Returns `true` (sensitive), `false` (clean), or `null` when the
+ * classifier is unavailable -- missing key, network error, timeout, or an
+ * unexpected response shape -- so the caller falls back to the keyword verdict.
+ * This is a best-effort augmentation, never a hard dependency of routing.
+ */
+export async function classifySensitivityViaModeration(
+  prompt: string,
+  cfg: Required<ModerationConfig>,
+): Promise<boolean | null> {
+  const apiKey = process.env[cfg.apiKeyEnv]
+  if (!apiKey) return null
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), cfg.timeoutMs)
+  try {
+    const res = await fetch(cfg.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model: cfg.model, input: [prompt] }),
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      results?: Array<{ category_scores?: Record<string, number> }>
+    }
+    const scores = data.results?.[0]?.category_scores
+    if (!scores) return null
+    for (const category of cfg.categories) {
+      if ((scores[category] ?? 0) >= cfg.threshold) return true
+    }
+    return false
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 interface OptimizerRequestPayload {
   config?: LlmCallConfig
   agent?: {
@@ -334,6 +400,10 @@ export function registerAntigravityOptimizer(
     sensitive_code: sovereignRouting?.pools?.sensitive_code ?? DEFAULT_SOVEREIGN_POOLS.sensitive_code,
   }
   const minSensitiveConfidence = sovereignRouting?.minSensitiveConfidence ?? 0.9
+  const moderation: Required<ModerationConfig> = {
+    ...DEFAULT_MODERATION,
+    ...(sovereignRouting?.moderation ?? {}),
+  }
 
   let gruntRotationIndex = 0
   const failedModels = new Set<string>()
@@ -371,7 +441,22 @@ export function registerAntigravityOptimizer(
 
     if (rawPrompt) {
       if (sovereignRouting?.enabled) {
-        const poolKey = classifyPromptPool(rawPrompt, minSensitiveConfidence)
+        let poolKey = classifyPromptPool(rawPrompt, minSensitiveConfidence)
+        // Semantic augmentation: keywords already caught the domain-specific tells
+        // (betmexico, bypass, checker...); if they did NOT flag this prompt and
+        // moderation is enabled, let the Mistral classifier upgrade it to the
+        // sensitive lane on a guard-prone category. Best-effort -- a null verdict
+        // (no key / error / timeout) keeps the keyword result.
+        if (
+          moderation.enabled &&
+          poolKey !== 'sensitive' &&
+          poolKey !== 'sensitive_code'
+        ) {
+          const flagged = await classifySensitivityViaModeration(rawPrompt, moderation)
+          if (flagged === true) {
+            poolKey = sensitiveLane(rawPrompt.toLowerCase())
+          }
+        }
         const selectedPool = pools[poolKey]
         if (selectedPool && selectedPool.models.length > 0) {
           let chosenModel: string | undefined
